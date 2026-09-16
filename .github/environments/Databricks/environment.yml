@@ -21,6 +21,6 @@ secrets:
 
 # Variáveis de ambiente
 variables:
-  ENVIRONMENT: production
+  ENVIRONMENT: development
   PIPELINE_NAME: MTG_PIPELINE
   WORKSPACE: databricks 

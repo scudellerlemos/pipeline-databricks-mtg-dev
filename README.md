@@ -111,7 +111,7 @@ pipeline-databricks-magic_card_game/
 - **Dados**: Cartas, Sets, Preços de mercado (USD, EUR, TIX)
 - **Formato**: Parquet, em snapshots datados (`{ano}_{mes}_{dia}_{tabela}.parquet`)
 - **Estratégia de carga**: FULL LOAD por execução — a Scryfall não expõe incrementalidade real; a data no nome do arquivo é a data de *ingestão* (para rastreabilidade e idempotência), não um filtro de negócio na origem
-- **Frequência**: Diária (6h da manhã); `card_prices` é idempotente por mês
+- **Frequência**: Mensal (1ª segunda-feira do mês, 6h, `America/Sao_Paulo` — ver `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`); `card_prices` é idempotente por mês
 - **Controle de execução**: um JSON por run em `_control/{tabela}/{run_id}.json` (status, contagens, duração, erro)
 - **Resiliência**: retry com backoff em erros HTTP transitórios (429/5xx)
 
@@ -159,12 +159,12 @@ pipeline-databricks-magic_card_game/
 | Componente | Tecnologia | Versão |
 |------------|------------|---------|
 | **Cloud Platform** | AWS | - |
-| **Data Platform** | Databricks | 14.3.x |
+| **Data Platform** | Databricks | 15.4.x |
 | **Processing** | Apache Spark | 3.5+ |
 | **Language** | Python | 3.9+ |
 | **Storage** | Delta Lake | - |
 | **CI/CD** | GitHub Actions | - |
-| **APIs** | Scryfall |
+| **APIs** | Scryfall | - |
 
 ## 🔗 **Fontes de Dados**
 
@@ -236,7 +236,7 @@ O pipeline é deployado automaticamente quando:
 
 #### **🛠️ Ambiente de Desenvolvimento (DEV)**
 ```yaml
-spark_version: "14.3.x-scala2.12"
+spark_version: "15.4.x-scala2.12"
 node_type_id: "m5d.large"
 num_workers: 1
 aws_attributes:
@@ -247,7 +247,7 @@ aws_attributes:
 
 #### **🚀 Ambiente de Produção (PRD) - Recomendado**
 ```yaml
-spark_version: "14.3.x-scala2.12"
+spark_version: "15.4.x-scala2.12"
 node_type_id: "m5d.xlarge"          # Maior capacidade
 num_workers: 2                       # Mais workers para performance
 aws_attributes:
@@ -261,7 +261,7 @@ spark_conf:
 ```
 
 ### **Schedule**
-- ⏰ **Frequência**: Diária às 6h (Brasil)
+- ⏰ **Frequência**: Mensal, 1ª segunda-feira do mês, às 6h (Brasil) — `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`
 - 🌍 **Timezone**: America/Sao_Paulo
 - 🔄 **Status**: UNPAUSED
 
