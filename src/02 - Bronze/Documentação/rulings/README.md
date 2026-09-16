@@ -11,8 +11,8 @@ sozinho não deixa claro - uma carta pode acumular várias rulings ao longo do
 tempo.
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.rulings`.
-- **Origem (Stage):** tabela `rulings`, gravada por [`src/01 - Ingestion/rulings.ipynb`](<../../../01 - Ingestion/rulings.ipynb>) a partir da API Scryfall (`/bulk-data` → `rulings`).
-- **Notebook Bronze:** [`../../Dev/rulings.ipynb`](../../Dev/rulings.ipynb).
+- **Origem (Stage):** tabela `rulings`, gravada por [`src/01 - Ingestion/rulings.py`](<../../../01 - Ingestion/rulings.py>) a partir da API Scryfall (`/bulk-data` → `rulings`).
+- **Notebook Bronze:** [`../../Dev/rulings.py`](../../Dev/rulings.py).
 - **Relação com `cards`:** ligação é por `oracle_id` (1 oracle_id → N impressões em `cards`) - resolver essa relação é trabalho da Silver, não desta camada.
 - **Histórico:** EL puro, sem deduplicação.
 

@@ -23,7 +23,7 @@ Catálogo de todos os símbolos de mana e custo usados pela Scryfall (cores, hí
   1. Scryfall API
   2. Ingestão para S3 (Stage)
   3. Processamento Bronze (`symbology`)
-  4. Transformação Silver (`src/03 - Silver/Dev/TB_DOM_SIMBOLOS.ipynb`)
+  4. Transformação Silver (`src/03 - Silver/Dev/TB_DOM_SIMBOLOS.py`)
   5. Escrita na tabela Delta: `TB_DOM_SIMBOLOS` (Unity Catalog)
 
 ## 5. Convenção de Nome de Coluna

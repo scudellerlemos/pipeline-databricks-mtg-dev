@@ -26,12 +26,12 @@ Cada notebook é independente e idempotente - pode ser reexecutado a
 qualquer momento sem duplicar dados (só processa arquivos novos da Stage):
 
 ```
-cards.ipynb
-sets.ipynb
-card_prices.ipynb
-symbology.ipynb
-rulings.ipynb
-migrations.ipynb
+cards.py
+sets.py
+card_prices.py
+symbology.py
+rulings.py
+migrations.py
 ```
 
 Não há ordem de dependência entre eles (cada um lê só sua própria origem na

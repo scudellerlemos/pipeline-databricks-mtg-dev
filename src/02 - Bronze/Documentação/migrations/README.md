@@ -10,8 +10,8 @@ um id antigo com o novo e evitar perder o vínculo de uma carta em
 análises/joins feitos antes da mudança.
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.migrations`.
-- **Origem (Stage):** tabela `migrations`, gravada por [`src/01 - Ingestion/migrations.ipynb`](<../../../01 - Ingestion/migrations.ipynb>) a partir da API Scryfall (`/migrations`).
-- **Notebook Bronze:** [`../../Dev/migrations.ipynb`](../../Dev/migrations.ipynb).
+- **Origem (Stage):** tabela `migrations`, gravada por [`src/01 - Ingestion/migrations.py`](<../../../01 - Ingestion/migrations.py>) a partir da API Scryfall (`/migrations`).
+- **Notebook Bronze:** [`../../Dev/migrations.py`](../../Dev/migrations.py).
 - **Histórico:** preservado integralmente, sem filtro, para a Silver resolver ids antigos se precisar.
 
 ## Colunas

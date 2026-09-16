@@ -21,34 +21,34 @@ A [magicthegathering.io](https://docs.magicthegathering.io) foi descontinuada co
 fonte (issues #121/#123/#127/#128/#129) — os três notebooks usam exclusivamente a
 [Scryfall API](https://scryfall.com/docs/api):
 
-- **`cards.ipynb`** e **`card_prices.ipynb`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
+- **`cards.py`** e **`card_prices.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
   (`default_cards` / `oracle_cards`) — 1 request pro índice + 1 download do `.jsonl.gz`
   inteiro, filtrado em memória. Sem paginação, sem 1 request por carta/coleção.
-- **`sets.ipynb`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
+- **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
   sem paginação. Além dos campos herdados da magicthegathering.io, captura também
   `card_count`, `parent_set_code`, `block` e `icon_svg_uri` — nativos da Scryfall,
   sem equivalente na fonte antiga, antes simplesmente não coletados.
-- **`symbology.ipynb`**: `GET /symbology` — catálogo inteiro de símbolos de carta/mana
+- **`symbology.py`**: `GET /symbology` — catálogo inteiro de símbolos de carta/mana
   em 1 request (`has_more: false`), sem paginação. Tabela de referência estática (84
   símbolos): sem filtro temporal, idempotência só por arquivo do dia. Hoje a Silver
   decodifica símbolo de mana com `regexp_replace` hardcoded (`{W}`→branco, `{U}`→azul
-  etc., em `TB_FATO_SILVER_CARDS`), cobrindo só os símbolos de cor básicos — perde
-  híbrido/Phyrexian. `symbology.ipynb` traz a fonte oficial pra esse mapeamento.
-- **`rulings.ipynb`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data) (`rulings`)
-  — mesmo padrão de `cards.ipynb`/`card_prices.ipynb` (1 request pro índice + 1
+  etc., em `TB_FATO_CARTAS`), cobrindo só os símbolos de cor básicos — perde
+  híbrido/Phyrexian. `symbology.py` traz a fonte oficial pra esse mapeamento.
+- **`rulings.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data) (`rulings`)
+  — mesmo padrão de `cards.py`/`card_prices.py` (1 request pro índice + 1
   download do `.jsonl.gz` inteiro). Sem filtro temporal: diferente de preço/impressão,
   uma ruling antiga sobre uma carta antiga continua válida hoje — não expira pelo
   calendário. Catálogo pequeno (~79k linhas, ~5MB comprimido), sem necessidade de
   recorte. Referencia a carta por `oracle_id` (não por impressão) — a Stage não hoje
-  captura `oracle_id` em `cards.ipynb`, então esse join fica pendente pra Bronze/Silver
-  até que `oracle_id` seja adicionado a `cards.ipynb` também.
-- **`migrations.ipynb`**: `GET /migrations` — único endpoint da Stage que pagina de
+  captura `oracle_id` em `cards.py`, então esse join fica pendente pra Bronze/Silver
+  até que `oracle_id` seja adicionado a `cards.py` também.
+- **`migrations.py`**: `GET /migrations` — único endpoint da Stage que pagina de
   verdade (`has_more`/`next_page`, ~350 registros por página), diferente do padrão
   "1 request só" usado no resto da camada. Histórico de reconciliação de
   `scryfall_id` (`migration_strategy`: `delete` remove um ID, `merge` aponta
   `old_scryfall_id` → `new_scryfall_id`), referenciado por `metadata.oracle_id`/
   `metadata.set_code`/`metadata.collector_number` (flattenados em colunas
-  `metadata_*`, mesmo padrão do `booster` explodido em `sets.ipynb`). Sem filtro
+  `metadata_*`, mesmo padrão do `booster` explodido em `sets.py`). Sem filtro
   temporal: cortar por data quebraria a rastreabilidade de IDs antigos que
   Bronze/Silver podem precisar resolver, mesmo tratando de cartas antigas.
 
@@ -61,12 +61,12 @@ e decide o que gravar via idempotência de arquivo (abaixo), não via delta da A
 
 | Notebook | Fonte | Grão | Observação |
 |---|---|---|---|
-| `cards.ipynb` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `set_codes` dentro da janela `years_back` (via `sets`) |
-| `sets.ipynb` | `GET /sets` | 1 linha por coleção | Filtra por `releaseDate >= cutoff` |
-| `card_prices.ipynb` | `bulk-data/oracle_cards` | 1 linha por carta (nome, deduplicado por Oracle ID) | Filtra por `releaseDate >= cutoff`, independente de `cards.ipynb` |
-| `symbology.ipynb` | `GET /symbology` | 1 linha por símbolo | Catálogo estático, sem filtro temporal |
-| `rulings.ipynb` | `bulk-data/rulings` | 1 linha por ruling (referenciada por `oracle_id`) | Sem filtro temporal, catálogo inteiro (~79k linhas) |
-| `migrations.ipynb` | `GET /migrations` | 1 linha por migração de ID | Único endpoint paginado da Stage, sem filtro temporal |
+| `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `set_codes` dentro da janela `years_back` (via `sets`) |
+| `sets.py` | `GET /sets` | 1 linha por coleção | Filtra por `releaseDate >= cutoff` |
+| `card_prices.py` | `bulk-data/oracle_cards` | 1 linha por carta (nome, deduplicado por Oracle ID) | Filtra por `releaseDate >= cutoff`, independente de `cards.py` |
+| `symbology.py` | `GET /symbology` | 1 linha por símbolo | Catálogo estático, sem filtro temporal |
+| `rulings.py` | `bulk-data/rulings` | 1 linha por ruling (referenciada por `oracle_id`) | Sem filtro temporal, catálogo inteiro (~79k linhas) |
+| `migrations.py` | `GET /migrations` | 1 linha por migração de ID | Único endpoint paginado da Stage, sem filtro temporal |
 
 Os notebooks são independentes entre si — nenhum lê o S3 gravado por outro. No
 job `MTG_STAGE` (`.github/DAGs/stage.yml`) as 6 tasks rodam em paralelo, sem
@@ -76,7 +76,7 @@ deu OOM rodando as 6 juntas) — trocado por autoscale (1→2 workers) no cluste
 do job, que dá folga pro pico das 6 tasks em paralelo sem exigir dependência
 manual no yml nem manter o custo de 2 workers o tempo todo.
 
-`card_prices.ipynb` já leu os arquivos de `cards.parquet` pra descobrir quais cartas
+`card_prices.py` já leu os arquivos de `cards.parquet` pra descobrir quais cartas
 precisava precificar (criando uma dependência de execução entre os dois); hoje ele
 grava seu próprio snapshot do catálogo `oracle_cards` filtrado pela mesma janela
 `years_back`, e o join "esse preço pertence a essas impressões" (1 preço → N

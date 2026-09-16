@@ -23,7 +23,7 @@ Histórico de migrações de id de carta feitas pela Scryfall (unificação de d
   1. Scryfall API
   2. Ingestão para S3 (Stage)
   3. Processamento Bronze (`migrations`)
-  4. Transformação Silver (`src/03 - Silver/Dev/TB_MOV_MIGRACOES_CARTAS.ipynb`)
+  4. Transformação Silver (`src/03 - Silver/Dev/TB_MOV_MIGRACOES_CARTAS.py`)
   5. Escrita na tabela Delta: `TB_MOV_MIGRACOES_CARTAS` (Unity Catalog)
 
 ## 5. Convenção de Nome de Coluna
@@ -62,14 +62,14 @@ Todas as colunas a partir da Silver são em PT-BR, sem acento, com a primeira le
 - **Filtro temporal:** não aplicado (histórico de migração é útil por completo).
 - **Merge incremental:** por `Id_migracao`, desempate por `Dt_ingestao` mais recente.
 - **Particionamento:** por `Ano_execucao` e `Mes_execucao`.
-- **Resolução de cadeia (`Id_carta_canonico`):** relocada de `TB_FATO_CARTAS.ipynb` (#135/#136) para este notebook nesta revisão. Segue a cadeia de unificações em Python puro (`_resolve_id_chain`, máx. 10 saltos, seguro contra ciclo) a partir das migrações com `Nme_estrategia_migracao = 'Unificacao'` e `Id_carta_novo` preenchido - testado isoladamente em `test_migration_chain.py`.
+- **Resolução de cadeia (`Id_carta_canonico`):** relocada de `TB_FATO_CARTAS.py` (#135/#136) para este notebook nesta revisão. Segue a cadeia de unificações em Python puro (`_resolve_id_chain`, máx. 10 saltos, seguro contra ciclo) a partir das migrações com `Nme_estrategia_migracao = 'Unificacao'` e `Id_carta_novo` preenchido - testado isoladamente em `test_migration_chain.py`.
 - **Regra "sem `( ) { }` no dado Silver":** `Desc_nota` converte `{...}`/`(...)` para `[...]`, mesma regra de `TB_FATO_CARTAS`.
 
 ## 9. Histórico de Alterações
 | Data | Responsável | Alteração |
 |---|---|---|
-| 2026-09-08 | Felipe | AUD-20 (#135): implementação inicial de `_resolve_id_chain`/`attach_canonical_id` dentro de `TB_FATO_SILVER_CARDS.ipynb` |
-| 2026-09-15 | Felipe | #115/#116: criada como tabela própria `TB_MOV_MIGRACOES_CARTAS` (DAMA - MOV), lógica de resolução de cadeia relocada de `TB_FATO_CARTAS.ipynb`, documentação de colunas de negócio no Unity Catalog |
+| 2026-09-08 | Felipe | AUD-20 (#135): implementação inicial de `_resolve_id_chain`/`attach_canonical_id` dentro de `TB_FATO_SILVER_CARDS.py` |
+| 2026-09-15 | Felipe | #115/#116: criada como tabela própria `TB_MOV_MIGRACOES_CARTAS` (DAMA - MOV), lógica de resolução de cadeia relocada de `TB_FATO_CARTAS.py`, documentação de colunas de negócio no Unity Catalog |
 
 ## 10. Observações
 - Pipeline exibe logs detalhados de transformações aplicadas.
