@@ -176,20 +176,6 @@ jobs:
         echo "🚀 Iniciando deploy do pipeline..."
         python .github/scripts/deploy.py
         
-    - name: Verify deployment
-      run: |
-        echo "⏳ Aguardando 30 segundos para verificar o deploy..."
-        sleep 30
-
-        echo "🔍 Verificando status dos jobs..."
-        for job in MTG_STAGE MTG_BRONZE MTG_PIPELINE MTG_SILVER MTG_GOLD; do
-          if databricks jobs list | grep -q "$job"; then
-            echo "✅ $job encontrado e configurado corretamente"
-          else
-            echo "⚠️ $job não encontrado na listagem (pode ser normal se for a primeira execução)"
-          fi
-        done
-        
     - name: Create deployment summary
       run: |
         echo "## 🚀 Deploy Concluído com Sucesso!" >> $GITHUB_STEP_SUMMARY
@@ -200,7 +186,7 @@ jobs:
         echo "- ✅ Job criado/atualizado no Databricks" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Verificação de status concluída" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 **Pipeline em produção!**" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **Pipeline atualizado no Databricks (ambiente: development)!**" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "📅 Deploy realizado em: $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
         
@@ -208,7 +194,7 @@ jobs:
       if: github.event_name == 'push'
       run: |
         echo "🎉 Deploy realizado com sucesso!"
-        echo "📍 Ambiente: Databricks Production"
+        echo "📍 Ambiente: Databricks (development)"
         echo "🔗 Host: $DATABRICKS_HOST"
         echo "📅 Data: $(date '+%Y-%m-%d %H:%M:%S')"
         echo "✅ Jobs MTG_STAGE, MTG_BRONZE, MTG_PIPELINE, MTG_SILVER e MTG_GOLD atualizados e funcionais"

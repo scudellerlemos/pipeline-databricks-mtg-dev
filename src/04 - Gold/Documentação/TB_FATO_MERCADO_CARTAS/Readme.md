@@ -8,8 +8,8 @@
 Visão única de mercado de cartas de Magic: The Gathering - combina catálogo de carta, coleção de origem, histórico de cotação de preço e volume de esclarecimentos oficiais de regras. Uma linha por cotação de preço de uma impressão de carta. Feita para consumo direto por analista/BI/Genie, sem precisar conhecer Bronze/Silver.
 
 ## 3. Origem dos Dados (Silver)
-- **Usadas (5 de 6):** `TB_FATO_CARTAS` (driver), `TB_FATO_PRECOS_CARTAS` (INNER JOIN por `NME_CARTA`), `TB_DIM_COLECOES` (LEFT JOIN por `COD_COLECAO`), `TB_FATO_ESCLARECIMENTOS_CARTAS` (agregada por `ID_ORACLE`, LEFT JOIN), `TB_MOV_MIGRACOES_CARTAS` (agregada por `ID_CARTA_ANTIGO`, LEFT JOIN em `ID_CARTA = ID_CARTA_ANTIGO` - resolve id de carta migrado/descontinuado pela Scryfall).
-- **Não usada (1 de 6), desvio documentado:** `TB_DOM_SIMBOLOS` (tabela de referência de símbolos de mana individuais - juntar exigiria explodir `DESC_CUSTO_MANA` em tokens, mudando o grão desta Gold). Ver docstring de `TB_FATO_MERCADO_CARTAS.py` para o raciocínio completo.
+- **Usadas (5 de 7):** `TB_FATO_CARTAS` (driver), `TB_FATO_PRECOS_CARTAS` (INNER JOIN por `NME_CARTA`), `TB_DIM_COLECOES` (LEFT JOIN por `COD_COLECAO`), `TB_FATO_ESCLARECIMENTOS_CARTAS` (agregada por `ID_ORACLE`, LEFT JOIN), `TB_MOV_MIGRACOES_CARTAS` (agregada por `ID_CARTA_ANTIGO`, LEFT JOIN em `ID_CARTA = ID_CARTA_ANTIGO` - resolve id de carta migrado/descontinuado pela Scryfall).
+- **Não usadas (2 de 7), desvio documentado:** `TB_DOM_SIMBOLOS` e `TB_PONTE_CARTA_SIMBOLOS` (grão carta x símbolo de mana, incompatível com o grão carta x cotação desta Gold - juntar exigiria explodir `DESC_CUSTO_MANA` em tokens). Ver docstring de `TB_FATO_MERCADO_CARTAS.py` para o raciocínio completo.
 
 ## 4. Grão e Chave Única
 - **Grão:** 1 linha por cotação de preço de uma impressão de carta.
