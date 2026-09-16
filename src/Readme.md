@@ -174,7 +174,7 @@ save_to_gold(df_gold, catalog_name, "gold", "TB_FATO_MERCADO_CARTAS", s3_gold_pa
 ## 📊 Métricas e KPIs do Pipeline
 
 ### **Performance**
-- **Ingestão**: 100 páginas por execução (demonstração)
+- **Ingestão**: bulk-data em um único download por tabela, sem paginação
 - **Processamento**: Incremental por chaves específicas
 - **Tempo de Execução**: <50 minutos para pipeline completo
 
@@ -227,8 +227,7 @@ s3_gold_prefix        # Prefixo da camada gold
 ## 🚀 Próximos Passos
 
 ### **Expansão Imediata**
-- Implementação de todas as tabelas Silver restantes
-- Criação de Data Warehouse completo (Star Schema)
+- Camada Gold com múltiplas tabelas (Star Schema completo, hoje é 1 tabela larga)
 - Análises por formato de jogo (Standard, Modern, Commander)
 
 ### **Melhorias Futuras**

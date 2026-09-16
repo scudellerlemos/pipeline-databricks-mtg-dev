@@ -37,7 +37,7 @@ resources:
 
       tags:
         project: "MTG"
-        environment: "production"
+        environment: "development"
         team: "data-engineering"
         api_source: "scryfall"
         layer: "gold"
