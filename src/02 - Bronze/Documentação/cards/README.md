@@ -11,8 +11,8 @@ tipo, raridade, artista, em qual set saiu e em quais formatos de jogo
 coleção ou busca de carta.
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.cards`.
-- **Origem (Stage):** tabela `cards`, gravada por [`src/01 - Ingestion/cards.ipynb`](<../../../01 - Ingestion/cards.ipynb>) a partir da API Scryfall (`/bulk-data` → `default_cards`).
-- **Notebook Bronze:** [`../../Dev/cards.ipynb`](../../Dev/cards.ipynb).
+- **Origem (Stage):** tabela `cards`, gravada por [`src/01 - Ingestion/cards.py`](<../../../01 - Ingestion/cards.py>) a partir da API Scryfall (`/bulk-data` → `default_cards`).
+- **Notebook Bronze:** [`../../Dev/cards.py`](../../Dev/cards.py).
 - **Histórico:** uma mesma carta (mesmo `id`) pode aparecer em runs diferentes com dados diferentes (ex.: `legalities` mudou) - cada run é preservada, sem deduplicação.
 
 ## Colunas

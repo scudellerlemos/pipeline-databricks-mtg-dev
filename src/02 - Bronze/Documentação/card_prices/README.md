@@ -12,8 +12,8 @@ carta tem várias linhas (uma por coleta) de propósito - é histórico, não é
 a cotação "atual".
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.card_prices`.
-- **Origem (Stage):** tabela `card_prices`, gravada por [`src/01 - Ingestion/card_prices.ipynb`](<../../../01 - Ingestion/card_prices.ipynb>) a partir da API Scryfall.
-- **Notebook Bronze:** [`../../Dev/card_prices.ipynb`](../../Dev/card_prices.ipynb).
+- **Origem (Stage):** tabela `card_prices`, gravada por [`src/01 - Ingestion/card_prices.py`](<../../../01 - Ingestion/card_prices.py>) a partir da API Scryfall.
+- **Notebook Bronze:** [`../../Dev/card_prices.py`](../../Dev/card_prices.py).
 - **Histórico:** o preço de uma mesma carta em runs/dias diferentes gera linhas diferentes, todas preservadas - não há filtro por data/período nem `dropDuplicates` por carta. Nenhuma checagem de consistência contra `cards` acontece aqui (a antiga limpeza cruzada que apagava preços de cartas "ausentes" era regra de negócio e foi removida desta camada).
 
 ## Colunas

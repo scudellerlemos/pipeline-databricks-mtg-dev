@@ -23,7 +23,7 @@ Esclarecimentos oficiais de regras (rulings) publicados pela Wizards/Scryfall pa
   1. Scryfall API
   2. Ingestão para S3 (Stage)
   3. Processamento Bronze (`rulings`)
-  4. Transformação Silver (`src/03 - Silver/Dev/TB_FATO_ESCLARECIMENTOS_CARTAS.ipynb`)
+  4. Transformação Silver (`src/03 - Silver/Dev/TB_FATO_ESCLARECIMENTOS_CARTAS.py`)
   5. Escrita na tabela Delta: `TB_FATO_ESCLARECIMENTOS_CARTAS` (Unity Catalog)
 
 ## 5. Convenção de Nome de Coluna

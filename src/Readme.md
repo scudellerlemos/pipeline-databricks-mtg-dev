@@ -70,41 +70,41 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 **Processo**: **TL (Transform & Load)**
 - **Transform**: Limpeza, padronização e enriquecimento via SQL (`spark.sql()` sobre temp views)
 - **Load**: Carregamento incremental com dados refinados
-- **Dados**: 3 tabelas enriquecidas e padronizadas
+- **Dados**: 7 tabelas enriquecidas e padronizadas
 
 **Características**:
 - ✅ Dados limpos e padronizados
 - ✅ Enriquecimento com categorias e métricas
-- ✅ Nomenclatura consistente (NME_, COD_, DESC_)
-- ✅ Particionamento otimizado
+- ✅ Nomenclatura 100% PT-BR com prefixo semântico (Id_, Nme_, Desc_, Cod_, Dt_, Qtd_, Vlr_, Num_, Url_)
+- ✅ Nomenclatura de tabela DAMA-DMBOK (Fato/Dimensão/Domínio/Ponte)
 - ✅ Qualidade de dados garantida
 - ✅ Transformações em SQL puro, sem UDFs Python
 
 **Tabelas**:
-- 🃏 **TB_FATO_SILVER_CARDS** - Cartas enriquecidas
-- 📦 **TB_REF_SILVER_SETS** - Expansões com metadados
-- 💰 **TB_FATO_SILVER_CARDPRICES** - Preços processados
+- 🃏 **TB_FATO_CARTAS** - Cartas enriquecidas
+- 📦 **TB_DIM_COLECOES** - Expansões com metadados
+- 💰 **TB_FATO_PRECOS_CARTAS** - Preços processados
+- 📜 **TB_FATO_ESCLARECIMENTOS_CARTAS** - Esclarecimentos oficiais de regras
+- 🔀 **TB_MOV_MIGRACOES_CARTAS** - Reconciliação de IDs de carta
+- 🔣 **TB_DOM_SIMBOLOS** - Catálogo de símbolos de mana/custo
+- 🧩 **TB_PONTE_CARTA_SIMBOLOS** - Ponte carta x símbolo (custo de mana explodido)
 
 ### 🥇 **Camada Gold** - Análises Executivas
 **Localização**: `src/04 - Gold/`
 
 **Processo**: **AL (Analyze & Load)**
-- **Analyze**: Análises pré-computadas e métricas de negócio via SQL (`spark.sql()` sobre temp views)
-- **Load**: Carregamento incremental de insights estratégicos
-- **Dados**: 3 tabelas de análise executiva
+- **Analyze**: Junção das tabelas Silver e cálculo de indicadores de mercado via SQL (`spark.sql()` sobre temp views)
+- **Load**: `MERGE INTO` idempotente, particionado por ano/mês de cotação
+- **Dados**: 1 tabela pronta para consumo direto (analista/BI/Genie), sem precisar conhecer Bronze/Silver
 
 **Características**:
-- ✅ Análises pré-computadas
-- ✅ Métricas de negócio e KPIs
-- ✅ Insights estratégicos
-- ✅ Categorizações automáticas
-- ✅ Prontidão executiva
+- ✅ Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras)
+- ✅ Grão: 1 linha por cotação de preço de uma impressão de carta
+- ✅ Data quality e auditoria por run (`TB_AUDITORIA_GOLD`)
 - ✅ Transformações em SQL puro, sem UDFs Python
 
 **Tabelas**:
-- 📊 **TB_ANALISE_MERCADO_CARTAS_EXECUTIVO** - Análise executiva de mercado
-- 📈 **TB_METRICAS_PERFORMANCE_INVESTIMENTOS** - KPIs de performance
-- 🚨 **TB_REPORT_ALERTAS_EXECUTIVOS** - Sistema de alertas
+- 📊 **TB_FATO_MERCADO_CARTAS** - Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras)
 
 ## 🔄 Fluxo de Dados Completo
 
@@ -138,18 +138,19 @@ run_bronze_ingestion(
 
 ### **3. Silver (03 - Silver)**
 ```python
-# Transformação e enriquecimento
-df_silver = transform_bronze_data(df_bronze)
-# Carregamento incremental na Silver
-load_to_silver_unity_incremental(df_silver, "TB_FATO_SILVER_CARDS")
+# Extração da Bronze e transformação via SQL (spark.sql() sobre temp view)
+df_bronze = extract_from_bronze(catalog_name, "cards")
+df_silver = spark.sql("SELECT ... FROM bronze_cards")  # ver Dev/TB_FATO_CARTAS.py
+# MERGE idempotente na Silver + comentários/PK no Unity Catalog
+save_to_silver(df_silver, catalog_name, "silver", "TB_FATO_CARTAS", s3_silver_path, ...)
 ```
 
 ### **4. Gold (04 - Gold)**
 ```python
-# Análises executivas
-df_gold = create_executive_analysis(df_silver)
-# Carregamento incremental na Gold
-load_to_gold_unity_incremental(df_gold, "TB_ANALISE_MERCADO_CARTAS_EXECUTIVO")
+# Extração das tabelas Silver e junção via SQL (spark.sql() sobre temp views)
+df_gold = spark.sql("SELECT ... FROM silver_fato_cartas JOIN ...")  # ver Dev/TB_FATO_MERCADO_CARTAS.py
+# Data quality + MERGE idempotente na Gold + auditoria em TB_AUDITORIA_GOLD
+save_to_gold(df_gold, catalog_name, "gold", "TB_FATO_MERCADO_CARTAS", s3_gold_path, ...)
 ```
 
 ## 🛠️ Tecnologias Utilizadas

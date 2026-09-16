@@ -52,7 +52,7 @@ spark.sql(f"""
 
 ## 📁 Estrutura dos Notebooks
 
-### 🃏 `Cards.ipynb`
+### 🃏 `Cards.py`
 - **Fonte**: Dados de cartas da Bronze
 - **Chave**: `ID_CARD`
 - **Características**: 
@@ -63,7 +63,7 @@ spark.sql(f"""
   - Particionamento por ano/mês de ingestão
 - **Tipo**: 🎴 Creature/Spell/Artifact (dados temporais)
 
-### 📦 `Sets.ipynb`
+### 📦 `Sets.py`
 - **Fonte**: Dados de expansões da Bronze
 - **Chave**: `COD_SET`
 - **Características**:
@@ -73,7 +73,7 @@ spark.sql(f"""
   - Particionamento por ano/mês de lançamento
 - **Tipo**: 📦 Expansion Set (dados temporais)
 
-### 💰 `Card_Prices.ipynb`
+### 💰 `Card_Prices.py`
 - **Fonte**: Dados de preços da Bronze
 - **Chave**: `[ID_CARD, DT_INGESTION]`
 - **Características**:

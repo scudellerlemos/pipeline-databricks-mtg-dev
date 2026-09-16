@@ -52,37 +52,41 @@ Este projeto implementa um **pipeline completo de dados** para análise de merca
 pipeline-databricks-magic_card_game/
 ├── 📁 src/
 │   ├── 📁 01 - Ingestion/          # 🚀 Ingestão de dados da Scryfall API (Stage)
-│   │   ├── cards.ipynb             # Cartas
-│   │   ├── sets.ipynb              # Sets/Expansões
-│   │   ├── card_prices.ipynb       # Preços das cartas
-│   │   ├── symbology.ipynb         # Símbolos de mana/custo
-│   │   ├── rulings.ipynb           # Esclarecimentos de regras
-│   │   ├── migrations.ipynb        # Reconciliação de IDs Scryfall
+│   │   ├── cards.py             # Cartas
+│   │   ├── sets.py              # Sets/Expansões
+│   │   ├── card_prices.py       # Preços das cartas
+│   │   ├── symbology.py         # Símbolos de mana/custo
+│   │   ├── rulings.py           # Esclarecimentos de regras
+│   │   ├── migrations.py        # Reconciliação de IDs Scryfall
 │   │   └── ingestion_utils.py      # HTTP retry, S3, controle de execução
 │   │
 │   ├── 📁 02 - Bronze/             # 🥉 Camada Bronze (Raw)
 │   │   ├── 📁 Dev/
-│   │   │   ├── cards.ipynb
-│   │   │   ├── sets.ipynb
-│   │   │   ├── card_prices.ipynb
-│   │   │   ├── symbology.ipynb
-│   │   │   ├── rulings.ipynb
-│   │   │   ├── migrations.ipynb
+│   │   │   ├── cards.py
+│   │   │   ├── sets.py
+│   │   │   ├── card_prices.py
+│   │   │   ├── symbology.py
+│   │   │   ├── rulings.py
+│   │   │   ├── migrations.py
 │   │   │   └── bronze_utils.py     # EL compartilhado (append + Unity Catalog)
 │   │   └── 📁 Documentação/
 │   │
 │   ├── 📁 03 - Silver/             # 🥈 Camada Silver (Cleaned)
 │   │   ├── 📁 Dev/
-│   │   │   ├── TB_FATO_CARTAS.ipynb
-│   │   │   ├── TB_DIM_COLECOES.ipynb
-│   │   │   ├── TB_REF_SILVER_FORMATS.ipynb
-│   │   │   ├── TB_REF_SILVER_TYPES.ipynb
-│   │   │   ├── TB_REF_SILVER_SUBTYPES.ipynb
-│   │   │   └── TB_REF_SILVER_SUPERTYPES.ipynb
+│   │   │   ├── TB_FATO_CARTAS.py
+│   │   │   ├── TB_DIM_COLECOES.py
+│   │   │   ├── TB_FATO_PRECOS_CARTAS.py
+│   │   │   ├── TB_FATO_ESCLARECIMENTOS_CARTAS.py
+│   │   │   ├── TB_MOV_MIGRACOES_CARTAS.py
+│   │   │   ├── TB_DOM_SIMBOLOS.py
+│   │   │   ├── TB_PONTE_CARTA_SIMBOLOS.py
+│   │   │   └── silver_utils.py     # TL compartilhado (transform + Unity Catalog)
 │   │   └── 📁 Documentação/
 │   │
-│   └── 📁 04 - Gold/               # 🥇 Camada Gold (Analytics) - scripts em reconstrução
-│       ├── 📁 Dev/                 # (vazio - notebooks antigos removidos, apontavam pra colunas pré-#115/#116)
+│   └── 📁 04 - Gold/               # 🥇 Camada Gold (Analytics)
+│       ├── 📁 Dev/
+│       │   ├── TB_FATO_MERCADO_CARTAS.py
+│       │   └── gold_utils.py       # config/extract/load/auditoria, mesmo padrão da Silver
 │       └── 📁 Documentação/
 │
 ├── 📁 .github/
@@ -126,9 +130,12 @@ pipeline-databricks-magic_card_game/
 - **Qualidade**: Validações e transformações
 
 ### **4. Gold Layer**
-- **Função**: Analytics e relatórios
-- **Métricas**: Performance de investimentos
-- **Dashboards**: Análise temporal e executiva
+- **Função**: Visão de mercado pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver
+- **Dados**: 1 tabela (`TB_FATO_MERCADO_CARTAS`) — combina catálogo de carta, coleção, cotação de preço e esclarecimentos de regras; 5 das 7 tabelas Silver alimentam a junção (`TB_DOM_SIMBOLOS`/`TB_PONTE_CARTA_SIMBOLOS` têm grão incompatível e ficam de fora)
+- **Grão**: 1 linha por cotação de preço de uma impressão de carta — chave `(Id_carta, Dt_cotacao)`
+- **Carga**: Full extract da Silver a cada execução + `MERGE INTO` idempotente, particionada por ano/mês de cotação
+- **Qualidade**: Checagens de PK/FK, valor negativo de preço e nulo residual, auditadas por run em `TB_AUDITORIA_GOLD`
+- **Documentação de negócio**: [`src/04 - Gold/Documentação/`](<src/04 - Gold/Documentação/Readme.md>)
 
 ## 🔄 **CI/CD Pipeline**
 
@@ -139,10 +146,10 @@ pipeline-databricks-magic_card_game/
 - ✅ **Comentários em PR**: Feedback automático
 
 ### **Deploy Automático**
-- 🚀 **Trigger**: Merge na branch `main`
-- 🔧 **Ambiente**: Databricks Production
-- 📊 **Status**: Notificações de sucesso
-- 🔄 **Rollback**: Automático em caso de falha
+- 🚀 **Trigger**: Push na branch `main`
+- 🔧 **Ambiente**: GitHub Environment `Databricks` (secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`)
+- 📦 **Ordem**: `MTG_STAGE` → `MTG_BRONZE` → `MTG_SILVER` → `MTG_GOLD` → `MTG_PIPELINE` (orquestrador, referencia os `job_id` dos 4 anteriores)
+- 📊 **Verificação**: checa se os 5 jobs existem no workspace após o deploy
 
 ## 🛠️ **Tecnologias**
 

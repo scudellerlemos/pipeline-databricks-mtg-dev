@@ -11,8 +11,8 @@ mana - tabela de apoio, praticamente estática (raramente ganha símbolo
 novo).
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.symbology`.
-- **Origem (Stage):** tabela `symbology`, gravada por [`src/01 - Ingestion/symbology.ipynb`](<../../../01 - Ingestion/symbology.ipynb>) a partir da API Scryfall (`/symbology`).
-- **Notebook Bronze:** [`../../Dev/symbology.ipynb`](../../Dev/symbology.ipynb).
+- **Origem (Stage):** tabela `symbology`, gravada por [`src/01 - Ingestion/symbology.py`](<../../../01 - Ingestion/symbology.py>) a partir da API Scryfall (`/symbology`).
+- **Notebook Bronze:** [`../../Dev/symbology.py`](../../Dev/symbology.py).
 - **Histórico:** catálogo de referência estático - mesmo assim, sem `MERGE`: cada execução é um snapshot append-only do catálogo.
 
 ## Colunas

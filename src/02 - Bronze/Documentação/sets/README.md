@@ -10,8 +10,8 @@ bloco pertence e o que vem num pacote de booster" - útil pra organizar
 coleção por edição ou situar uma carta na linha do tempo do jogo.
 
 - **Tabela Unity Catalog:** `{catalog}.bronze.sets`.
-- **Origem (Stage):** tabela `sets`, gravada por [`src/01 - Ingestion/sets.ipynb`](<../../../01 - Ingestion/sets.ipynb>) a partir da API Scryfall (`/sets`).
-- **Notebook Bronze:** [`../../Dev/sets.ipynb`](../../Dev/sets.ipynb).
+- **Origem (Stage):** tabela `sets`, gravada por [`src/01 - Ingestion/sets.py`](<../../../01 - Ingestion/sets.py>) a partir da API Scryfall (`/sets`).
+- **Notebook Bronze:** [`../../Dev/sets.py`](../../Dev/sets.py).
 - **Histórico:** um mesmo set pode aparecer em runs diferentes com dados diferentes; cada run é preservada, sem deduplicação.
 
 ## Colunas

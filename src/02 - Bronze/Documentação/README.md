@@ -20,12 +20,12 @@ Unity Catalog (`{catalog}.bronze.cards`, etc.), o prefixo seria redundante.
 
 | Tabela Bronze | Tabela de origem (Stage) | Notebook | Schema (fonte) | Detalhes |
 |---|---|---|---|---|
-| `cards` | `cards` | [`cards.ipynb`](../Dev/cards.ipynb) | [`src/01 - Ingestion/cards.ipynb`](<../../01 - Ingestion/cards.ipynb>) | [`cards/README.md`](./cards/README.md) |
-| `sets` | `sets` | [`sets.ipynb`](../Dev/sets.ipynb) | [`src/01 - Ingestion/sets.ipynb`](<../../01 - Ingestion/sets.ipynb>) | [`sets/README.md`](./sets/README.md) |
-| `card_prices` | `card_prices` | [`card_prices.ipynb`](../Dev/card_prices.ipynb) | [`src/01 - Ingestion/card_prices.ipynb`](<../../01 - Ingestion/card_prices.ipynb>) | [`card_prices/README.md`](./card_prices/README.md) |
-| `symbology` | `symbology` | [`symbology.ipynb`](../Dev/symbology.ipynb) | [`src/01 - Ingestion/symbology.ipynb`](<../../01 - Ingestion/symbology.ipynb>) | [`symbology/README.md`](./symbology/README.md) |
-| `rulings` | `rulings` | [`rulings.ipynb`](../Dev/rulings.ipynb) | [`src/01 - Ingestion/rulings.ipynb`](<../../01 - Ingestion/rulings.ipynb>) | [`rulings/README.md`](./rulings/README.md) |
-| `migrations` | `migrations` | [`migrations.ipynb`](../Dev/migrations.ipynb) | [`src/01 - Ingestion/migrations.ipynb`](<../../01 - Ingestion/migrations.ipynb>) | [`migrations/README.md`](./migrations/README.md) |
+| `cards` | `cards` | [`cards.py`](../Dev/cards.py) | [`src/01 - Ingestion/cards.py`](<../../01 - Ingestion/cards.py>) | [`cards/README.md`](./cards/README.md) |
+| `sets` | `sets` | [`sets.py`](../Dev/sets.py) | [`src/01 - Ingestion/sets.py`](<../../01 - Ingestion/sets.py>) | [`sets/README.md`](./sets/README.md) |
+| `card_prices` | `card_prices` | [`card_prices.py`](../Dev/card_prices.py) | [`src/01 - Ingestion/card_prices.py`](<../../01 - Ingestion/card_prices.py>) | [`card_prices/README.md`](./card_prices/README.md) |
+| `symbology` | `symbology` | [`symbology.py`](../Dev/symbology.py) | [`src/01 - Ingestion/symbology.py`](<../../01 - Ingestion/symbology.py>) | [`symbology/README.md`](./symbology/README.md) |
+| `rulings` | `rulings` | [`rulings.py`](../Dev/rulings.py) | [`src/01 - Ingestion/rulings.py`](<../../01 - Ingestion/rulings.py>) | [`rulings/README.md`](./rulings/README.md) |
+| `migrations` | `migrations` | [`migrations.py`](../Dev/migrations.py) | [`src/01 - Ingestion/migrations.py`](<../../01 - Ingestion/migrations.py>) | [`migrations/README.md`](./migrations/README.md) |
 
 Todas as 6 tabelas têm um `README.md` próprio com a descrição de negócio da
 tabela (o que é, pra que serve) e a lista completa de colunas específicas
