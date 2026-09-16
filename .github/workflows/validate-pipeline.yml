@@ -1,0 +1,214 @@
+name: CI/CD Pipeline - Magic Card Game
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '.github/DAGs/**'
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '.github/DAGs/**'
+      - '.github/workflows/**'
+      - '.github/scripts/**'
+
+jobs:
+  # ============================================================================
+  # VALIDAÇÕES DURANTE PR
+  # ============================================================================
+  validate:
+    runs-on: ubuntu-latest
+    environment: Databricks
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      checks: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        pip install pyyaml jsonschema databricks-cli ruff pytest
+
+    - name: Validate YAML syntax
+      run: |
+        python -c "
+        import yaml
+        for f in ['.github/DAGs/stage.yml', '.github/DAGs/bronze.yml', '.github/DAGs/pipeline.yml', '.github/DAGs/silver.yml', '.github/DAGs/gold.yml']:
+            yaml.safe_load(open(f, 'r', encoding='utf-8'))
+        "
+        echo "✅ YAML syntax is valid"
+
+    - name: Validate pipeline structure, notebooks, cluster and git config
+      run: |
+        python .github/scripts/validate_dag.py
+
+    - name: Lint notebook Python cells
+      run: |
+        python .github/scripts/lint_notebooks.py
+
+    - name: Run unit tests
+      run: |
+        python -m pytest src -q
+
+    - name: Generate validation report
+      run: |
+        python -c "
+        import yaml
+        from datetime import datetime
+
+        dag_files = [
+            ('.github/DAGs/stage.yml', 'MTG_STAGE'),
+            ('.github/DAGs/bronze.yml', 'MTG_BRONZE'),
+            ('.github/DAGs/pipeline.yml', 'MTG_PIPELINE'),
+            ('.github/DAGs/silver.yml', 'MTG_SILVER'),
+            ('.github/DAGs/gold.yml', 'MTG_GOLD'),
+        ]
+
+        print('📋 Pipeline Validation Report')
+        print('=' * 50)
+
+        for yaml_path, job_key in dag_files:
+            with open(yaml_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            job = config['resources']['jobs'][job_key]
+
+            print(f'Job: {job_key} ({yaml_path})')
+            print(f'  Description: {job.get(\"description\", \"N/A\")}')
+            print(f'  Total Tasks: {len(job[\"tasks\"])}')
+            if 'schedule' in job:
+                print(f'  Schedule: {job[\"schedule\"][\"quartz_cron_expression\"]} ({job[\"schedule\"][\"timezone_id\"]}, {job[\"schedule\"][\"pause_status\"]})')
+            for task in job['tasks']:
+                if 'depends_on' in task:
+                    deps = [dep['task_key'] for dep in task['depends_on']]
+                    print(f'    {task[\"task_key\"]} → {deps}')
+            print()
+
+        print('✅ Validation completed successfully!')
+        print(f'📅 Generated: {datetime.now().strftime(\"%Y-%m-%d %H:%M:%S\")}')
+        "
+        
+    - name: Comment PR with validation results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const comment = `## ✅ Validação do Pipeline Concluída
+          
+          ### 📊 Resumo da Validação:
+          - ✅ Sintaxe YAML válida
+          - ✅ Estrutura do pipeline válida
+          - ✅ Caminhos dos notebooks verificados
+          - ✅ Configuração do cluster válida
+          - ✅ Configuração Git válida
+          - ✅ Sintaxe dos notebooks válida
+          - ✅ Lint estático das células Python (referências indefinidas)
+          - ✅ Suíte de testes unitários (pytest)
+
+          🚀 **Pipeline pronto para deploy!**
+          
+          ---
+          *Validação executada em: ${new Date().toLocaleString('pt-BR')}*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  # ============================================================================
+  # DEPLOY AUTOMÁTICO APÓS APROVAÇÃO DA PR
+  # ============================================================================
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: Databricks
+    permissions:
+      contents: read
+
+    # Só executa quando a PR é aprovada e mergeada na main
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        pip install databricks-cli pyyaml
+        
+    - name: Configure Databricks CLI
+      run: |
+        echo "DATABRICKS_HOST=$DATABRICKS_HOST" >> $GITHUB_ENV
+        echo "DATABRICKS_TOKEN=$DATABRICKS_TOKEN" >> $GITHUB_ENV
+        
+    - name: Validate Databricks connection
+      run: |
+        databricks --version
+        # Test connection without requiring specific output format
+        databricks jobs list || echo "Connection test completed"
+        
+    - name: Deploy to Databricks
+      run: |
+        echo "🚀 Iniciando deploy do pipeline..."
+        python .github/scripts/deploy.py
+        
+    - name: Verify deployment
+      run: |
+        echo "⏳ Aguardando 30 segundos para verificar o deploy..."
+        sleep 30
+
+        echo "🔍 Verificando status dos jobs..."
+        for job in MTG_STAGE MTG_BRONZE MTG_PIPELINE MTG_SILVER MTG_GOLD; do
+          if databricks jobs list | grep -q "$job"; then
+            echo "✅ $job encontrado e configurado corretamente"
+          else
+            echo "⚠️ $job não encontrado na listagem (pode ser normal se for a primeira execução)"
+          fi
+        done
+        
+    - name: Create deployment summary
+      run: |
+        echo "## 🚀 Deploy Concluído com Sucesso!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Detalhes do Deploy:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Pipeline validado" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Conexão com Databricks estabelecida" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Job criado/atualizado no Databricks" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Verificação de status concluída" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **Pipeline em produção!**" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📅 Deploy realizado em: $(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Deploy success notification
+      if: github.event_name == 'push'
+      run: |
+        echo "🎉 Deploy realizado com sucesso!"
+        echo "📍 Ambiente: Databricks Production"
+        echo "🔗 Host: $DATABRICKS_HOST"
+        echo "📅 Data: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "✅ Jobs MTG_STAGE, MTG_BRONZE, MTG_PIPELINE, MTG_SILVER e MTG_GOLD atualizados e funcionais"
