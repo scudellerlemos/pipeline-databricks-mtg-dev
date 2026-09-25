@@ -63,7 +63,8 @@ def test_fetch_price_records_maps_fields():
         "id": "aaaa-1111",
         "name": "Nissa, Worldsoul Speaker", "set": "drc", "rarity": "rare",
         "released_at": "2025-01-31",
-        "prices": {"usd": "0.25", "eur": "0.21", "tix": "1.04"},
+        "prices": {"usd": "0.25", "usd_foil": "1.90", "usd_etched": None,
+                   "eur": "0.21", "eur_foil": "1.55", "tix": "1.04"},
         "scryfall_uri": "https://scryfall.com/x",
         "image_uris": {"normal": "https://img/x.jpg"},
     }]
@@ -78,6 +79,9 @@ def test_fetch_price_records_maps_fields():
     assert records[0]["usd"] == "0.25"
     assert records[0]["eur"] == "0.21"
     assert records[0]["tix"] == "1.04"
+    assert records[0]["usd_foil"] == "1.90"
+    assert records[0]["eur_foil"] == "1.55"
+    assert records[0]["usd_etched"] is None
     assert records[0]["scryfall_uri"] == "https://scryfall.com/x"
     assert records[0]["image_url"] == "https://img/x.jpg"
     assert records[0]["releaseDate"] == "2025-01-31"
@@ -124,6 +128,24 @@ def test_reimpressoes_do_mesmo_nome_viram_linhas_com_precos_proprios():
     assert len({r["name"] for r in records}) == 1
 
 
+def test_variantes_foil_sao_capturadas_separadamente():
+    # Foil e outra cotação da MESMA impressao, nao outra impressao - chega a
+    # valer multiplos do nao-foil (Lightning Bolt em msc: 0.74 vs 3.73).
+    # Capturar so `usd` exibia uma variante como se fosse o preco da impressao.
+    cards = [{"id": "bolt-msc", "name": "Lightning Bolt", "set": "msc",
+              "released_at": "2026-06-26",
+              "prices": {"usd": "0.74", "usd_foil": "3.73", "tix": "0.02"}}]
+
+    _, fetch_price_records = _load_functions(_fake_get_for(cards))
+    r = fetch_price_records()[0]
+
+    assert r["usd"] == "0.74"
+    assert r["usd_foil"] == "3.73"
+    # ausente na fonte continua None, nunca 0 - "sem cotacao" != "vale zero"
+    assert r["usd_etched"] is None
+    assert r["eur_foil"] is None
+
+
 def test_fetch_price_records_returns_one_row_per_catalog_entry():
     cards = [
         {"name": "A", "released_at": "2020-01-01", "prices": {}},
@@ -142,5 +164,6 @@ if __name__ == "__main__":
     test_fetch_price_records_maps_fields()
     test_double_faced_card_keeps_combined_name_as_is()
     test_reimpressoes_do_mesmo_nome_viram_linhas_com_precos_proprios()
+    test_variantes_foil_sao_capturadas_separadamente()
     test_fetch_price_records_returns_one_row_per_catalog_entry()
     print("OK")

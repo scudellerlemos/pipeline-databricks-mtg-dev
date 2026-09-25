@@ -21,6 +21,9 @@ run se (ID_CARTA, DT_COTACAO) repetir ou vier NULA.
 VLR_USD/EUR/TIX são o preço DAQUELA impressão, não do nome da carta - uma
 reimpressão barata e um original caro são linhas distintas com valores
 distintos, que é o que torna SUM/AVG por coleção ou raridade legítimo aqui.
+As colunas _FOIL/_ETCHED são outra cotação da MESMA impressão (foil vale
+múltiplos do não-foil), por isso são colunas e não linhas - um SUM(VLR_USD)
+ignora o valor foil da coleção - some VLR_USD_FOIL à parte se quiser ele.
 
 TABELAS SILVER USADAS (5 de 6):
 - TB_FATO_CARTAS (driver): 1 linha por impressão de carta.
@@ -174,7 +177,10 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
             COALESCE(col.DT_LANCAMENTO, DATE'1001-01-01') AS DT_LANCAMENTO_COLECAO,
             p.DT_INGESTAO AS DT_COTACAO,
             p.VLR_USD,
+            p.VLR_USD_FOIL,
+            p.VLR_USD_ETCHED,
             p.VLR_EUR,
+            p.VLR_EUR_FOIL,
             p.VLR_TIX,
             COALESCE(e.QTD_ESCLARECIMENTOS, 0) AS QTD_ESCLARECIMENTOS,
             COALESCE(e.DT_ULTIMO_ESCLARECIMENTO, DATE'1001-01-01') AS DT_ULTIMO_ESCLARECIMENTO,
@@ -251,7 +257,8 @@ dq_resultados = run_data_quality_checks(spark, full_table_name, {
     "fk_null_id_oracle": f"SELECT COUNT(*) FROM {full_table_name} WHERE ID_ORACLE IS NULL",
     "fk_colecao_nao_encontrada": f"SELECT COUNT(*) FROM {full_table_name} WHERE NME_COLECAO = 'Nao_Identificado'",
     "valor_negativo_preco": f"""SELECT COUNT(*) FROM {full_table_name}
-        WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0""",
+        WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0
+           OR VLR_USD_FOIL < 0 OR VLR_USD_ETCHED < 0 OR VLR_EUR_FOIL < 0""",
     "null_residual_categorico": f"""SELECT COUNT(*) FROM {full_table_name}
         WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
            OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL
