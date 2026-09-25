@@ -33,9 +33,10 @@ MAX_RETRIES = int(get_secret("max_retries", "3"))
 # coleção.
 SCRYFALL_API_URL = get_secret("scryfall_api_url")
 SCRYFALL_HEADERS = {"User-Agent": "MTGPipeline/1.0"}
-# default_cards = 1 objeto por impressão (não por Oracle ID) - cards.ipynb
-# grava 1 linha por impressão (set/artist/number/imageUrl variam por edição),
-# granularidade que oracle_cards (usado no card_prices) não tem.
+# default_cards = 1 objeto por impressão (não por Oracle ID) - grava 1 linha
+# por impressão, já que set/artist/number/imageUrl variam por edição. Mesmo
+# bulk usado por card_prices.py, pelo mesmo motivo: preço também varia por
+# impressão.
 SCRYFALL_BULK_TYPE = "default_cards"
 
 # Configurações do S3

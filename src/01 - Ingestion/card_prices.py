@@ -33,9 +33,12 @@ SCRYFALL_API_URL = get_secret("scryfall_api_url")
 # Scryfall rejeita o User-Agent default do requests (erro "generic_user_agent")
 SCRYFALL_HEADERS = {"User-Agent": "MTGPipeline/1.0"}
 MAX_RETRIES = int(get_secret("max_retries", "3"))
-# oracle_cards = 1 objeto por Oracle ID (deduplicado entre impressões da
-# mesma carta).
-SCRYFALL_BULK_TYPE = "oracle_cards"
+# default_cards = 1 objeto por IMPRESSÃO, cada um com seu próprio `prices` -
+# o mesmo bulk que cards.py usa. O preço de Magic varia por impressão (um
+# Lightning Bolt de 1993 e a reimpressão de 2026 não valem o mesmo), então
+# oracle_cards (1 objeto por Oracle ID, deduplicado entre impressões) devolvia
+# o preço de uma impressão arbitrária como se fosse o preço "da carta".
+SCRYFALL_BULK_TYPE = "default_cards"
 
 # Janela temporal: mesma fonte que cards/sets (secret years_back). card_prices
 # grava seu próprio snapshot independente e aplica o mesmo filtro por
@@ -53,6 +56,9 @@ print(f"YEARS_BACK: {YEARS_BACK} | CUTOFF_DATE_STR: {CUTOFF_DATE_STR}")
 # FUNÇÕES ESPECÍFICAS DE CARD_PRICES
 # =============================================================================
 CARD_PRICES_SCHEMA = StructType([
+    # id = id da impressão (mesmo `id` de cards.py) - chave de join com
+    # TB_FATO_CARTAS.ID_CARTA da Silver em diante.
+    StructField("id", StringType(), True),
     StructField("name", StringType(), True),
     StructField("set", StringType(), True),
     StructField("rarity", StringType(), True),
@@ -67,12 +73,12 @@ CARD_PRICES_SCHEMA = StructType([
 
 def _to_price_record(card):
     # Landing zone captura o catálogo de preços como a Scryfall devolve, sem
-    # tentar casar por nome com os arquivos de `cards` já gravados no S3 -
-    # esse join (1 preço -> N impressões da mesma carta, já que oracle_cards
-    # é deduplicado por Oracle ID) fica pra Bronze/Silver, não pra Stage.
+    # tentar casar com os arquivos de `cards` já gravados no S3 - esse join
+    # (1:1 por id da impressão) fica pra Silver/Gold, não pra Stage.
     prices = card.get("prices", {}) or {}
     image_uris = card.get("image_uris")
     return {
+        "id": card.get("id"),
         "name": card.get("name"),
         "set": card.get("set"),
         "rarity": card.get("rarity"),
@@ -100,7 +106,7 @@ def fetch_price_records():
 
 
 def ingest_card_prices(table_name="card_prices", run=None):
-    print("Baixando catálogo de preços Scryfall (oracle_cards)...")
+    print(f"Baixando catálogo de preços Scryfall ({SCRYFALL_BULK_TYPE})...")
 
     all_data = fetch_price_records()
     print(f"Preços obtidos do catálogo: {len(all_data)}")
@@ -152,7 +158,7 @@ print("Setup concluído com sucesso")
 # Controle de execução (run_id, status, contagens) via run_stage_ingestion -
 # padroniza o wrapper start_run -> try/ingest -> finish_run - ver ingestion_utils.py
 prices_df, run = run_stage_ingestion(
-    "card_prices", "bulk-data/oracle_cards",
+    "card_prices", "bulk-data/default_cards",
     lambda run: ingest_card_prices(table_name="card_prices", run=run),
     S3_BASE_PATH,
     params={"years_back": YEARS_BACK},

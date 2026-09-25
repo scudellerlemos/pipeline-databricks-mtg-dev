@@ -28,7 +28,7 @@ def _load_functions(fake_get):
         "StringType": lambda: None,
         "SCRYFALL_API_URL": "https://api.scryfall.test",
         "SCRYFALL_HEADERS": {},
-        "SCRYFALL_BULK_TYPE": "oracle_cards",
+        "SCRYFALL_BULK_TYPE": "default_cards",
         "MAX_RETRIES": 3,
     }
     exec(cell_source, ns)
@@ -51,7 +51,7 @@ def _fake_get_for(cards):
     def fake_get(url, headers=None, timeout=None):
         if url.endswith("/bulk-data"):
             return _Resp(json_data={"data": [
-                {"type": "oracle_cards", "jsonl_download_uri": "https://data.test/oracle.jsonl.gz"}
+                {"type": "default_cards", "jsonl_download_uri": "https://data.test/default.jsonl.gz"}
             ]})
         body = "\n".join(json.dumps(c) for c in cards).encode("utf-8")
         return _Resp(content=gzip.compress(body))
@@ -60,6 +60,7 @@ def _fake_get_for(cards):
 
 def test_fetch_price_records_maps_fields():
     cards = [{
+        "id": "aaaa-1111",
         "name": "Nissa, Worldsoul Speaker", "set": "drc", "rarity": "rare",
         "released_at": "2025-01-31",
         "prices": {"usd": "0.25", "eur": "0.21", "tix": "1.04"},
@@ -71,6 +72,7 @@ def test_fetch_price_records_maps_fields():
     records = fetch_price_records()
 
     assert len(records) == 1
+    assert records[0]["id"] == "aaaa-1111"
     assert records[0]["name"] == "Nissa, Worldsoul Speaker"
     assert records[0]["set"] == "drc"
     assert records[0]["usd"] == "0.25"
@@ -101,6 +103,27 @@ def test_double_faced_card_keeps_combined_name_as_is():
     assert records[0]["image_url"] is None
 
 
+def test_reimpressoes_do_mesmo_nome_viram_linhas_com_precos_proprios():
+    # O motivo de trocar oracle_cards -> default_cards: em Magic o preco varia
+    # por impressao (o Lightning Bolt tem 70 delas, de ~0,74 a centenas de USD).
+    # oracle_cards colapsava tudo num objeto so e devolvia o preco de uma
+    # impressao arbitraria como se fosse "o preco da carta".
+    cards = [
+        {"id": "bolt-lea", "name": "Lightning Bolt", "set": "lea",
+         "released_at": "1993-08-05", "prices": {"usd": "412.00"}},
+        {"id": "bolt-sos", "name": "Lightning Bolt", "set": "sos",
+         "released_at": "2026-04-24", "prices": {"usd": "1.35"}},
+    ]
+
+    _, fetch_price_records = _load_functions(_fake_get_for(cards))
+    records = fetch_price_records()
+
+    assert [r["id"] for r in records] == ["bolt-lea", "bolt-sos"]
+    assert [r["usd"] for r in records] == ["412.00", "1.35"]
+    # mesmo nome nas duas - e por isso que a chave de join deixou de ser o nome
+    assert len({r["name"] for r in records}) == 1
+
+
 def test_fetch_price_records_returns_one_row_per_catalog_entry():
     cards = [
         {"name": "A", "released_at": "2020-01-01", "prices": {}},
@@ -118,5 +141,6 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     test_fetch_price_records_maps_fields()
     test_double_faced_card_keeps_combined_name_as_is()
+    test_reimpressoes_do_mesmo_nome_viram_linhas_com_precos_proprios()
     test_fetch_price_records_returns_one_row_per_catalog_entry()
     print("OK")
