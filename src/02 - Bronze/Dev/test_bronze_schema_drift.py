@@ -14,11 +14,25 @@ def normalize_path(path):
     return path
 
 
-def list_stage_files_filter(names):
+def list_stage_files_filter(names, contents=None):
     """Mirrors list_stage_files' filter: dbutils.fs.ls names a directory with
     a trailing "/" (Spark's .save(path) always writes `path` as a directory),
-    so the check must strip it before comparing the ".parquet" suffix."""
-    return [n for n in names if n.rstrip("/").endswith(".parquet")]
+    so the check must strip it before comparing the ".parquet" suffix.
+
+    contents maps a directory name to what's inside it. A directory with no
+    part-file is a write that started and never committed (only the
+    _started_* commit marker is left); it must be skipped, or read.parquet
+    fails the whole Bronze run with UNABLE_TO_INFER_SCHEMA."""
+    contents = contents or {}
+    out = []
+    for n in names:
+        if not n.rstrip("/").endswith(".parquet"):
+            continue
+        inner = contents.get(n)
+        if inner is not None and not any(i.endswith(".parquet") for i in inner):
+            continue
+        out.append(n)
+    return out
 
 
 def find_new_files(all_stage_files, already_loaded_files):
@@ -115,6 +129,19 @@ def test_list_stage_files_filter_matches_directory_entries():
     assert list_stage_files_filter(names) == ["2026_09_15_cards.parquet/"]
 
 
+def test_uncommitted_write_directory_is_skipped():
+    # Bug real: 2022_04_16_card_prices.parquet/ ficou no S3 com só o marcador
+    # _started_* (escrita que não commitou, mascarada por um falso sucesso na
+    # Stage). Entrava em new_files e derrubava a Bronze inteira com
+    # UNABLE_TO_INFER_SCHEMA.
+    names = ["ok.parquet/", "quebrado.parquet/"]
+    contents = {
+        "ok.parquet/": ["part-00000-x.snappy.parquet", "_SUCCESS"],
+        "quebrado.parquet/": ["_started_5021188249195991183"],
+    }
+    assert list_stage_files_filter(names, contents) == ["ok.parquet/"]
+
+
 def test_normalize_path_truncates_part_file_to_parquet_dir():
     # _metadata.file_path aponta pro part-file dentro do diretório ".parquet";
     # list_stage_files devolve o diretório em si - sem truncar, nunca bateriam.
@@ -144,6 +171,7 @@ if __name__ == "__main__":
     test_schema_diff_first_load_is_all_new()
     test_stage_table_path_is_per_table_subfolder()
     test_list_stage_files_filter_matches_directory_entries()
+    test_uncommitted_write_directory_is_skipped()
     test_normalize_path_truncates_part_file_to_parquet_dir()
     test_already_loaded_part_file_marks_directory_as_not_new()
     print("OK")

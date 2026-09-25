@@ -46,10 +46,22 @@ def list_stage_files(dbutils, s3_stage_path, stage_table_name):
     df.write.save(path) grava `path` como um DIRETÓRIO - dbutils.fs.ls devolve
     seu nome com "/" no final (ex.: "2026_09_15_cards.parquet/"), daí o
     rstrip("/") antes do endswith(".parquet").
+
+    Diretório sem part-file dentro é escrita que começou e não commitou (sobra
+    só o marcador _started_* do protocolo de commit). Ignorar aqui, senão ele
+    entra em new_files e spark.read.parquet quebra a Bronze inteira com
+    UNABLE_TO_INFER_SCHEMA por causa de um resto de run antiga.
     """
     table_path = f"{s3_stage_path}/{stage_table_name}"
     all_files = dbutils.fs.ls(table_path)
-    return sorted(f.path for f in all_files if f.name.rstrip("/").endswith(".parquet"))
+    dirs = [f.path for f in all_files if f.name.rstrip("/").endswith(".parquet")]
+    validos = []
+    for d in dirs:
+        if any(i.name.endswith(".parquet") for i in dbutils.fs.ls(d)):
+            validos.append(d)
+        else:
+            print(f"[stage] ignorando escrita nao commitada: {d}")
+    return sorted(validos)
 
 
 def normalize_path(path):

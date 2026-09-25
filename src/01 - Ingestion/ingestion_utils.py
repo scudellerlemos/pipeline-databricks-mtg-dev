@@ -259,16 +259,23 @@ def run_stage_ingestion(table_name, endpoint, ingest_fn, base_path, params=None)
     Padroniza o wrapper start_run -> try/ingest_fn -> finish_run repetido
     quase byte-a-byte nos 6 notebooks de Stage (cards/sets/card_prices/
     symbology/rulings/migrations). ingest_fn é chamado como ingest_fn(run) e
-    deve devolver o DataFrame gravado, ou None se a ingestão não gravou nada
-    (vira FAILED). Devolve (df, run) - o relatório impresso ao final continua
-    no notebook, já que o conteúdo varia por tabela.
+    deve devolver o DataFrame gravado; None significa que nada foi gravado e
+    levanta - o job precisa ficar vermelho. Devolve (df, run) - o relatório
+    impresso ao final continua no notebook, já que o conteúdo varia por tabela.
     """
     run = start_run(table_name, endpoint=endpoint, params=params)
     try:
         print(f"Iniciando ingestão de {table_name}...")
         df = ingest_fn(run)
-        status = "SUCCESS" if df is not None else "FAILED"
-        finish_run(run, base_path, status)
+        if df is None:
+            # O status ja era FAILED aqui, mas a funcao retornava normalmente e
+            # a task do job fechava verde. Foi assim que uma escrita que nao
+            # commitou ficou no S3 sem ninguem ver, ate a Bronze quebrar nela.
+            # O except abaixo cuida do finish_run(FAILED).
+            raise Exception(
+                f"Ingestao de {table_name} nao gravou nada: {run.get('error') or 'sem dados'}"
+            )
+        finish_run(run, base_path, "SUCCESS")
         return df, run
     except Exception as e:
         finish_run(run, base_path, "FAILED", error=str(e))
