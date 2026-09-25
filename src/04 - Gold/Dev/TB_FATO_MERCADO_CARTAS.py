@@ -127,10 +127,25 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
         SELECT COUNT(DISTINCT c.ID_CARTA)
         FROM _cartas c
         LEFT JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
-        WHERE p.NME_CARTA IS NULL
+        WHERE p.ID_CARTA IS NULL
     """).collect()[0][0] or 0
     nivel = "⚠️" if qtd_cartas_sem_cotacao > 0 else "✅"
     print(f"{nivel} DQ [pré-join] cartas_excluidas_sem_cotacao_de_preco: {qtd_cartas_sem_cotacao}")
+
+    # DATA QUALITY - lado espelho: preço de impressão que não está em
+    # TB_FATO_CARTAS. card_prices filtra por releaseDate e cards filtra por
+    # código de coleção (/sets), então token, promo e art series entram no preço
+    # e não na carta. São mantidos de propósito na Silver - cotação é o único
+    # dado não reproduzível do pipeline, carta volta inteira em toda run - mas o
+    # INNER JOIN abaixo os exclui, então a contagem fica logada em vez de sumir.
+    qtd_precos_sem_carta = spark.sql("""
+        SELECT COUNT(DISTINCT p.ID_CARTA)
+        FROM _precos p
+        LEFT JOIN _cartas c ON p.ID_CARTA = c.ID_CARTA
+        WHERE c.ID_CARTA IS NULL
+    """).collect()[0][0] or 0
+    nivel = "⚠️" if qtd_precos_sem_carta > 0 else "✅"
+    print(f"{nivel} DQ [pré-join] precos_excluidos_sem_carta: {qtd_precos_sem_carta}")
 
     spark.sql("""
         CREATE OR REPLACE TEMP VIEW _esclarecimentos_agg AS
