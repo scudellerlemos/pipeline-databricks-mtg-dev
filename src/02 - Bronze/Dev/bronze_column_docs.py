@@ -90,8 +90,9 @@ BRONZE_TABLES = {
         },
     },
     "card_prices": {
-        "comment": "Histórico de cotações de preço de cartas em dólar, euro e MTGO ticket - cada linha é o preço de uma carta em um momento coletado. Serve pra acompanhar valorização/desvalorização de uma carta ao longo do tempo, comparar preço entre cartas/sets ou montar um indicador de valor de coleção. Uma mesma carta tem várias linhas (uma por coleta) de propósito - é histórico, não é a cotação 'atual'.",
+        "comment": "Histórico de cotações de preço de cartas em dólar, euro e MTGO ticket - cada linha é o preço de uma IMPRESSÃO de carta em um momento coletado. Preço em Magic varia por impressão: a mesma carta reimpressa em outro set tem cotação própria, e cada uma aparece aqui com seu `id`. Serve pra acompanhar valorização/desvalorização ao longo do tempo, comparar preço entre impressões/sets ou montar um indicador de valor de coleção. A mesma impressão tem várias linhas (uma por coleta) de propósito - é histórico, não é a cotação 'atual'.",
         "columns": {
+            "id": "Id da impressão cotada - mesmo id da tabela `cards`. Chave de join entre preço e carta.",
             "name": "Nome da carta.",
             "set": "Código do set/edição desta impressão.",
             "rarity": "Raridade da impressão.",
