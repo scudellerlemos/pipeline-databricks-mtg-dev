@@ -181,12 +181,31 @@ def test_run_stage_ingestion_success_returns_df_and_success_status():
     assert run["status"] == "SUCCESS"
 
 
-def test_run_stage_ingestion_none_df_marks_failed_without_raising():
-    df, run = ingestion_utils.run_stage_ingestion("sets", "sets", lambda run: None, "s3://test-bucket/stage")
+def test_run_stage_ingestion_none_df_raises():
+    # Antes isto devolvia (None, run) com status FAILED e a task do job fechava
+    # verde - foi assim que uma escrita nao commitada passou despercebida ate a
+    # Bronze quebrar nela.
+    try:
+        ingestion_utils.run_stage_ingestion("sets", "sets", lambda run: None, "s3://test-bucket/stage")
+    except Exception as e:
+        assert "nao gravou nada" in str(e), str(e)
+    else:
+        raise AssertionError("esperava excecao quando ingest_fn nao grava nada")
 
-    assert df is None
-    assert run["status"] == "FAILED"
-    assert run["error"] is None  # sem exceção - só ingest_fn não gravou nada
+
+def test_run_stage_ingestion_none_df_propaga_erro_do_save():
+    # save_to_parquet engole a excecao e so registra em run["error"] - a
+    # mensagem tem que chegar no job, senao o motivo real se perde.
+    def ingest_fn(run):
+        run["error"] = "S3 timeout"
+        return None
+
+    try:
+        ingestion_utils.run_stage_ingestion("sets", "sets", ingest_fn, "s3://test-bucket/stage")
+    except Exception as e:
+        assert "S3 timeout" in str(e), str(e)
+    else:
+        raise AssertionError("esperava excecao")
 
 
 def test_run_stage_ingestion_exception_marks_failed_and_reraises():
@@ -212,6 +231,7 @@ if __name__ == "__main__":
     test_finish_run_without_dbutils_does_not_raise()
     test_finish_run_writes_control_json_when_dbutils_available()
     test_run_stage_ingestion_success_returns_df_and_success_status()
-    test_run_stage_ingestion_none_df_marks_failed_without_raising()
+    test_run_stage_ingestion_none_df_raises()
+    test_run_stage_ingestion_none_df_propaga_erro_do_save()
     test_run_stage_ingestion_exception_marks_failed_and_reraises()
     print("OK")
