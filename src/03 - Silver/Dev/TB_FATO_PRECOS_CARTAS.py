@@ -8,7 +8,11 @@ Transformacao e limpeza de dados da Bronze para Silver.
 
 CLASSIFICACAO DAMA-DMBOK: Fato - uma linha por coleta de preco de uma
 IMPRESSAO de carta (grao), com medidas quantitativas
-(VLR_USD/VLR_EUR/VLR_TIX). Fato independente de TB_FATO_CARTAS - quem
+(VLR_USD/VLR_USD_FOIL/VLR_USD_ETCHED/VLR_EUR/VLR_EUR_FOIL/VLR_TIX). A
+fonte cota cada variante fisica da mesma impressao separadamente (foil chega
+a valer multiplos do nao-foil), entao as variantes sao COLUNAS da mesma
+linha, nao linhas novas - o grao continua sendo a impressao.
+Fato independente de TB_FATO_CARTAS - quem
 precisar combinar carta com preco faz o join na Gold por ID_CARTA.
 
 GRAO: mesmo grao de TB_FATO_CARTAS (impressao), mais a data da coleta.
@@ -92,7 +96,10 @@ def transform_card_prices_silver(df):
             upper(`set`) AS COD_COLECAO,
             rarity AS NME_RARIDADE,
             cast(usd AS float) AS VLR_USD,
+            cast(usd_foil AS float) AS VLR_USD_FOIL,
+            cast(usd_etched AS float) AS VLR_USD_ETCHED,
             cast(eur AS float) AS VLR_EUR,
+            cast(eur_foil AS float) AS VLR_EUR_FOIL,
             cast(tix AS float) AS VLR_TIX,
             scryfall_uri AS URL_SCRYFALL,
             image_url AS URL_IMAGEM,

@@ -62,8 +62,15 @@ CARD_PRICES_SCHEMA = StructType([
     StructField("name", StringType(), True),
     StructField("set", StringType(), True),
     StructField("rarity", StringType(), True),
+    # A Scryfall cota cada variante fisica da mesma impressao separadamente -
+    # foil chega a valer varios multiplos do nao-foil (ex.: Lightning Bolt em
+    # msc, usd 0.74 vs usd_foil 3.73). Capturar so `usd` exibiria o preco de
+    # uma variante como se fosse o da impressao inteira.
     StructField("usd", StringType(), True),
+    StructField("usd_foil", StringType(), True),
+    StructField("usd_etched", StringType(), True),
     StructField("eur", StringType(), True),
+    StructField("eur_foil", StringType(), True),
     StructField("tix", StringType(), True),
     StructField("scryfall_uri", StringType(), True),
     StructField("image_url", StringType(), True),
@@ -83,7 +90,10 @@ def _to_price_record(card):
         "set": card.get("set"),
         "rarity": card.get("rarity"),
         "usd": prices.get("usd"),
+        "usd_foil": prices.get("usd_foil"),
+        "usd_etched": prices.get("usd_etched"),
         "eur": prices.get("eur"),
+        "eur_foil": prices.get("eur_foil"),
         "tix": prices.get("tix"),
         "scryfall_uri": card.get("scryfall_uri"),
         "image_url": image_uris.get("normal") if image_uris else None,
