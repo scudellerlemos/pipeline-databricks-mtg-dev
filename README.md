@@ -8,7 +8,7 @@
 
 </div>
 
-[![CI/CD Pipeline](https://github.com/scudellerlemos/pipeline-databricks-magic_card_game/actions/workflows/validate-pipeline.yml/badge.svg)](https://github.com/scudellerlemos/pipeline-databricks-magic_card_game/actions/workflows/validate-pipeline.yml)
+[![CI/CD Pipeline](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev/actions/workflows/validate-pipeline.yml/badge.svg)](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev/actions/workflows/validate-pipeline.yml)
 [![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=flat&logo=databricks&logoColor=white)](https://databricks.com/)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![Apache Spark](https://img.shields.io/badge/Apache%20Spark-E25A1C?style=flat&logo=apachespark&logoColor=white)](https://spark.apache.org/)
@@ -49,7 +49,7 @@ Este projeto implementa um **pipeline completo de dados** para análise de merca
 ## 📁 **Estrutura do Projeto**
 
 ```
-pipeline-databricks-magic_card_game/
+pipeline-databricks-mtg-dev/
 ├── 📁 src/
 │   ├── 📁 01 - Ingestion/          # 🚀 Ingestão de dados da Scryfall API (Stage)
 │   │   ├── cards.py             # Cartas
@@ -200,8 +200,8 @@ pipeline-databricks-magic_card_game/
 ### **1. Configuração Inicial**
 ```bash
 # Clone o repositório
-git clone https://github.com/scudellerlemos/pipeline-databricks-magic_card_game.git
-cd pipeline-databricks-magic_card_game
+git clone https://github.com/scudellerlemos/pipeline-databricks-mtg-dev.git
+cd pipeline-databricks-mtg-dev
 
 # Configure as variáveis de ambiente
 export DATABRICKS_HOST="your-databricks-instance"
@@ -235,15 +235,38 @@ O pipeline é deployado automaticamente quando:
 ### **Cluster Configuration**
 
 #### **🛠️ Ambiente de Desenvolvimento (DEV)**
+
+Definido em `.github/DAGs/{stage,bronze,silver,gold}.yml` — os quatro usam o mesmo bloco:
+
 ```yaml
 spark_version: "15.4.x-scala2.12"
-node_type_id: "m5d.large"
-num_workers: 1
-aws_attributes:
-  first_on_demand: 1
-  zone_id: "us-west-1a"
-  spot_bid_price_percent: 100
+instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
+driver_instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
+autoscale:
+  min_workers: 1
+  max_workers: 2
+spark_conf:
+  spark.databricks.delta.preview.enabled: "true"
+  spark.databricks.delta.optimizeWrite.enabled: "true"
+  spark.databricks.delta.autoCompact.enabled: "true"
 ```
+
+O node type (`m5d.large`), a zona (`us-west-2a`) e a disponibilidade (`ON_DEMAND`)
+vêm do instance pool `mtg-pipeline-pool-dbr154`, não do YAML:
+
+| Campo do pool | Valor |
+|---|---|
+| `node_type_id` | `m5d.large` |
+| `preloaded_spark_versions` | `15.4.x-scala2.12` |
+| `min_idle_instances` | `0` |
+| `max_capacity` | `6` |
+| `idle_instance_autotermination_minutes` | `10` |
+
+> ⚠️ **`preloaded_spark_versions` do pool tem que bater com o `spark_version` dos
+> YAMLs.** Se divergir, o cluster baixa e instala o runtime inteiro em cada subida
+> — que é justamente o custo que o pool existe pra eliminar. Esse campo é
+> **imutável depois que o pool é criado**: pra trocar de runtime é preciso criar um
+> pool novo e atualizar o `instance_pool_id` nos quatro YAMLs.
 
 #### **🚀 Ambiente de Produção (PRD) - Recomendado**
 ```yaml
@@ -252,7 +275,7 @@ node_type_id: "m5d.xlarge"          # Maior capacidade
 num_workers: 2                       # Mais workers para performance
 aws_attributes:
   first_on_demand: 1
-  zone_id: "us-west-1a"
+  zone_id: "us-west-2a"
   spot_bid_price_percent: 100
 spark_conf:
   spark.databricks.delta.preview.enabled: "true"
@@ -270,7 +293,7 @@ spark_conf:
 | Aspecto | DEV | PRD |
 |---------|-----|-----|
 | **Node Type** | m5d.large | m5d.xlarge |
-| **Workers** | 1 | 2 |
+| **Workers** | 1-2 (autoscale) | 2 |
 | **Performance** | Básica | Otimizada |
 | **Custo** | Baixo | Médio |
 | **Uso** | Testes/Desenvolvimento | Produção |

@@ -18,6 +18,9 @@ def _load_functions(fake_get):
 
     ns = {
         "json": json,
+        # vem do %run ./ingestion_utils no notebook - comportamento real
+        # coberto por test_ingestion_utils.test_as_float_converte_int_e_preserva_none
+        "as_float": lambda v: float(v) if v is not None else None,
         "gzip": gzip,
         "http_get_with_retry": lambda url, headers=None, timeout=30, retries=3: fake_get(url, headers=headers, timeout=timeout),
         "StructType": lambda fields: None,

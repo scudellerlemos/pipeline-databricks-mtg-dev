@@ -48,26 +48,22 @@ def setup_unity_catalog(catalog, schema):
         catalog (str): Nome do catalog
         schema (str): Nome do schema
 
-    Returns:
-        bool: True se configuração foi bem-sucedida
+    Levanta a excecao original se o catalog/schema nao puder ser configurado:
+    nenhum call site checava o retorno antigo, entao engolir a falha aqui
+    deixava o notebook seguir e a task fechar verde sem ter escrito nada.
     """
     spark_session = get_spark_session()
+    # ponytail: tenta USE primeiro - este metastore não tem storage root
+    # default, então CREATE CATALOG sem MANAGED LOCATION falha mesmo com
+    # IF NOT EXISTS quando o catalog já existe (caso normal aqui).
     try:
-        # ponytail: tenta USE primeiro - este metastore não tem storage root
-        # default, então CREATE CATALOG sem MANAGED LOCATION falha mesmo com
-        # IF NOT EXISTS quando o catalog já existe (caso normal aqui).
-        try:
-            spark_session.sql(f"USE CATALOG {catalog}")
-        except Exception:
-            spark_session.sql(f"CREATE CATALOG IF NOT EXISTS {catalog}")
-            spark_session.sql(f"USE CATALOG {catalog}")
-        spark_session.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
-        spark_session.sql(f"USE SCHEMA {schema}")
-        print(f"Schema {catalog}.{schema} configurado com sucesso")
-        return True
-    except Exception as e:
-        print(f"Erro ao configurar Unity Catalog: {e}")
-        return False
+        spark_session.sql(f"USE CATALOG {catalog}")
+    except Exception:
+        spark_session.sql(f"CREATE CATALOG IF NOT EXISTS {catalog}")
+        spark_session.sql(f"USE CATALOG {catalog}")
+    spark_session.sql(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+    spark_session.sql(f"USE SCHEMA {schema}")
+    print(f"Schema {catalog}.{schema} configurado com sucesso")
 
 # ============================================================================
 # SECRETS
