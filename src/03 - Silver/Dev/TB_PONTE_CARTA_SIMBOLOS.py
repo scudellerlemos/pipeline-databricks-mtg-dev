@@ -94,12 +94,13 @@ def transform_ponte_carta_simbolos(df_cartas, df_simbolos):
 
     # DQ informativo: símbolo extraído do custo de mana sem match no domínio
     # (não bloqueia a run - só sinaliza símbolo novo/não catalogado).
-    qtd_simbolo_nao_catalogado = spark.sql(r"""
-        SELECT COUNT(*) FROM _cartas c
-        LATERAL VIEW posexplode(regexp_extract_all(c.DESC_CUSTO_MANA, '\\[[^\\]]*\\]', 0)) AS pos, simbolo
-        LEFT JOIN _simbolos s ON simbolo = s.COD_SIMBOLO
-        WHERE c.DESC_CUSTO_MANA IS NOT NULL AND c.DESC_CUSTO_MANA != 'NA' AND s.COD_SIMBOLO IS NULL
-    """).collect()[0][0] or 0
+    # ponytail: reusa df_final (ja explodido) em vez de repetir o posexplode.
+    # LATERAL VIEW nao aceita JOIN depois dele na mesma clausula FROM, e o ON
+    # precisaria da coluna que o proprio explode gera - por isso a versao SQL
+    # quebrava com PARSE_SYNTAX_ERROR antes de rodar o DQ.
+    qtd_simbolo_nao_catalogado = df_final.join(
+        df_simbolos, on="COD_SIMBOLO", how="left_anti"
+    ).count()
     nivel = "⚠️" if qtd_simbolo_nao_catalogado > 0 else "✅"
     print(f"{nivel} DQ simbolos_sem_match_em_TB_DOM_SIMBOLOS: {qtd_simbolo_nao_catalogado}")
 
