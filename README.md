@@ -8,7 +8,7 @@
 
 </div>
 
-[![CI/CD Pipeline](https://github.com/scudellerlemos/pipeline-databricks-magic_card_game/actions/workflows/validate-pipeline.yml/badge.svg)](https://github.com/scudellerlemos/pipeline-databricks-magic_card_game/actions/workflows/validate-pipeline.yml)
+[![CI/CD Pipeline](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev/actions/workflows/validate-pipeline.yml/badge.svg)](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev/actions/workflows/validate-pipeline.yml)
 [![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=flat&logo=databricks&logoColor=white)](https://databricks.com/)
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
 [![Apache Spark](https://img.shields.io/badge/Apache%20Spark-E25A1C?style=flat&logo=apachespark&logoColor=white)](https://spark.apache.org/)
@@ -49,7 +49,7 @@ Este projeto implementa um **pipeline completo de dados** para análise de merca
 ## 📁 **Estrutura do Projeto**
 
 ```
-pipeline-databricks-magic_card_game/
+pipeline-databricks-mtg-dev/
 ├── 📁 src/
 │   ├── 📁 01 - Ingestion/          # 🚀 Ingestão de dados da Scryfall API (Stage)
 │   │   ├── cards.py             # Cartas
@@ -200,8 +200,8 @@ pipeline-databricks-magic_card_game/
 ### **1. Configuração Inicial**
 ```bash
 # Clone o repositório
-git clone https://github.com/scudellerlemos/pipeline-databricks-magic_card_game.git
-cd pipeline-databricks-magic_card_game
+git clone https://github.com/scudellerlemos/pipeline-databricks-mtg-dev.git
+cd pipeline-databricks-mtg-dev
 
 # Configure as variáveis de ambiente
 export DATABRICKS_HOST="your-databricks-instance"
