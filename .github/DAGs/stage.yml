@@ -48,8 +48,8 @@ resources:
             spark_version: "15.4.x-scala2.12"
             # Instance pool: instancias on-demand ja provisionadas, o cluster
             # so precisa instalar o runtime Spark, entao sobe bem mais rapido.
-            instance_pool_id: "0916-013412-junta23-pool-be84woia"
-            driver_instance_pool_id: "0916-013412-junta23-pool-be84woia"
+            instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
+            driver_instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
             # Autoscale: numero de workers cresce conforme a carga das 6
             # tasks rodando em paralelo, sem manter 2 workers ligados o tempo
             # todo.
