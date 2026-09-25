@@ -115,7 +115,7 @@ def _to_card_record(card):
     return {
         "name": card.get("name"),
         "manaCost": _face_fallback(card, "mana_cost"),
-        "cmc": card.get("cmc"),
+        "cmc": as_float(card.get("cmc")),
         "colors": json.dumps(colors) if colors is not None else None,
         "colorIdentity": json.dumps(color_identity) if color_identity is not None else None,
         "type": card.get("type_line"),

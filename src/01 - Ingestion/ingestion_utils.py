@@ -121,6 +121,14 @@ def get_scryfall_set_codes_since(scryfall_api_url, headers, cutoff_date_str, ret
     return codes
 
 
+def as_float(valor):
+    """A Scryfall manda inteiro (ex.: mana_value 0) em campos que o schema
+    declara Double/Float, e createDataFrame rejeita int em DoubleType com
+    FIELD_DATA_TYPE_UNACCEPTABLE_WITH_NAME. Converte preservando None.
+    """
+    return float(valor) if valor is not None else None
+
+
 def save_to_parquet(spark, data, table_name, base_path, schema=None,
                      partition_source_col=None, cutoff_date_str=None, run=None):
     """

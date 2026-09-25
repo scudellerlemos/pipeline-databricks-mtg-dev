@@ -78,10 +78,10 @@ def _to_symbol_record(s):
         "transposable": s.get("transposable"),
         "represents_mana": s.get("represents_mana"),
         "appears_in_mana_costs": s.get("appears_in_mana_costs"),
-        "mana_value": s.get("mana_value"),
+        "mana_value": as_float(s.get("mana_value")),
         "hybrid": s.get("hybrid"),
         "phyrexian": s.get("phyrexian"),
-        "cmc": s.get("cmc"),
+        "cmc": as_float(s.get("cmc")),
         "funny": s.get("funny"),
         # colors/gatherer_alternates são listas (ou null) na Scryfall - mesmo
         # tratamento de booster em sets.ipynb: serializa como JSON pra caber
