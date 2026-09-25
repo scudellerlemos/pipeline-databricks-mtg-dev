@@ -231,6 +231,19 @@ def test_run_stage_ingestion_exception_marks_failed_and_reraises():
         raise AssertionError("expected ValueError to propagate")
 
 
+def test_run_timestamp_e_constante_entre_chamadas():
+    # O bug que isso trava: save_to_parquet chama .write uma vez por particao e
+    # current_timestamp() era reavaliado a cada uma, entao card_prices saia com
+    # 71 carimbos diferentes numa run so - e DT_INGESTAO e metade da chave de
+    # merge da Silver.
+    run = ingestion_utils.start_run("card_prices", "bulk-data/default_cards")
+
+    assert ingestion_utils._run_timestamp(run) == ingestion_utils._run_timestamp(run)
+    assert ingestion_utils._run_timestamp(run).isoformat() == run["started_at"]
+    # run e opcional em save_to_parquet - sem ele ainda devolve um carimbo
+    assert ingestion_utils._run_timestamp(None) is not None
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     test_http_get_with_retry_returns_response_on_success()
@@ -246,4 +259,5 @@ if __name__ == "__main__":
     test_as_float_converte_int_e_preserva_none()
     test_run_stage_ingestion_none_df_propaga_erro_do_save()
     test_run_stage_ingestion_exception_marks_failed_and_reraises()
+    test_run_timestamp_e_constante_entre_chamadas()
     print("OK")
