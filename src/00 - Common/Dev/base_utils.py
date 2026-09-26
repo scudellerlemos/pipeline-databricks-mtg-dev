@@ -17,6 +17,8 @@ ADAPTADO PARA DATABRICKS NOTEBOOKS:
 # quando isso acontece; fora de um notebook Databricks (ex.: pytest local),
 # get_ipython() é None e o bloco é ignorado, preservando o NameError esperado
 # pelos testes locais (ver test_base_utils_get_secret.py).
+import os
+
 try:
     dbutils
 except NameError:
@@ -25,6 +27,18 @@ except NameError:
         dbutils = IPython.get_ipython().user_ns["dbutils"]
     except Exception:
         pass
+
+
+def secret_scope():
+    """Scope de secret do ambiente atual.
+
+    dev e prd dividem o mesmo workspace, entao o que separa os dois e de qual
+    scope saem catalog_name / s3_bucket / prefixos. A env var vem de
+    spark_env_vars no cluster, injetada pelo deploy.py conforme o alvo - o YAML
+    do job e identico nos dois repos de proposito.
+    """
+    return os.environ.get("MTG_SECRET_SCOPE", "mtg-pipeline")
+
 
 # ============================================================================
 # INICIALIZAÇÃO PARA DATABRICKS
@@ -85,7 +99,7 @@ def get_secret(secret_name, default_value=None, extra_safe_defaults=None):
         Exception: Se secret obrigatório não for encontrado e sem default
     """
     try:
-        return dbutils.secrets.get(scope="mtg-pipeline", key=secret_name)
+        return dbutils.secrets.get(scope=secret_scope(), key=secret_name)
     except:
         if default_value is not None:
             print(f"Secret '{secret_name}' não encontrado, usando valor padrão: {default_value}")
@@ -94,9 +108,12 @@ def get_secret(secret_name, default_value=None, extra_safe_defaults=None):
         # ponytail: s3_bucket não entra em safe_defaults de propósito - é o
         # destino real de escrita/leitura de todas as camadas, então preferimos
         # falhar alto a gravar silenciosamente num bucket placeholder inexistente.
-        safe_defaults = {
-            'catalog_name': 'mtg_dev'
-        }
+        # ponytail: o default de catalog_name so vale no scope de dev. Em prd,
+        # secret faltando tem que explodir - cair pra mtg_dev faria um job de
+        # producao gravar por cima das tabelas de desenvolvimento, em silencio.
+        safe_defaults = (
+            {'catalog_name': 'mtg_dev'} if secret_scope() == "mtg-pipeline" else {}
+        )
         safe_defaults.update(extra_safe_defaults or {})
 
         if secret_name in safe_defaults:

@@ -62,7 +62,7 @@ jobs:
 
     - name: Run unit tests
       run: |
-        python -m pytest src -q
+        python -m pytest src .github/scripts -q
 
     - name: Generate validation report
       run: |

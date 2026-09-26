@@ -17,6 +17,7 @@ mecanismo de captura de alteração) e sem regra de negócio - isso é Bronze/Si
 """
 
 import json
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -39,9 +40,20 @@ except NameError:
         pass
 
 
+def secret_scope():
+    """Scope de secret do ambiente atual.
+
+    dev e prd dividem o mesmo workspace, entao o que separa os dois e de qual
+    scope saem catalog_name / s3_bucket / prefixos. A env var vem de
+    spark_env_vars no cluster, injetada pelo deploy.py conforme o alvo - o YAML
+    do job e identico nos dois repos de proposito.
+    """
+    return os.environ.get("MTG_SECRET_SCOPE", "mtg-pipeline")
+
+
 def get_secret(secret_name, default_value=None):
     try:
-        return dbutils.secrets.get(scope="mtg-pipeline", key=secret_name)
+        return dbutils.secrets.get(scope=secret_scope(), key=secret_name)
     except Exception:
         if default_value is not None:
             print(f"Segredo '{secret_name}' não encontrado, usando valor padrão")
