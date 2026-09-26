@@ -11,7 +11,27 @@ on:
 jobs:
   avisar-repo-de-producao:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
+      # `git tag v9 && git push --tags` funciona em QUALQUER commit, inclusive
+      # um que nunca virou PR e nunca passou pelo required check da main. Sem
+      # esta checagem a tag e um desvio completo do portao de revisao.
+      - name: Checkout com historico
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exigir que a tag esteja na main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::A tag $GITHUB_REF_NAME aponta pra um commit que nao esta na main."
+            echo "Producao so roda codigo que passou pelo PR. Apague a tag, faca merge e tagueie de novo."
+            exit 1
+          fi
+          echo "✅ $GITHUB_REF_NAME esta na main"
+
       - name: Disparar deploy no repo de produção
         env:
           # PAT com permissao de escrita no repo de controle. E o unico secret
@@ -22,3 +42,4 @@ jobs:
           {"event_type": "deploy-prd", "client_payload": {"tag": "${GITHUB_REF_NAME}"}}
           EOF
           echo "Deploy de ${GITHUB_REF_NAME} solicitado ao repo de producao."
+          echo "O workflow de la PARA no portao de aprovacao do environment Databricks-Prod."
