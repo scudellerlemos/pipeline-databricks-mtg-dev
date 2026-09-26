@@ -1,0 +1,80 @@
+name: Validade das credenciais
+
+# Os dois tokens que a esteira usa (o PAT do Databricks e o PAT que dispara o
+# repo de producao) expiram em silencio: no dia seguinte o deploy quebra com
+# erro de auth e ninguem sabe por que. Este workflow roda todo mes e FALHA
+# quando falta menos de 60 dias - falha de workflow agendado ja manda email
+# pro dono do repo, entao o aviso nao precisa de canal novo.
+#
+# Aviso, nao renovacao: rodar tokens sozinho exigiria um token com poder de
+# criar tokens, que e o problema que estamos tentando nao ter.
+
+on:
+  schedule:
+    - cron: '0 10 1 * *'   # dia 1 de todo mes, 07h em Sao Paulo
+  workflow_dispatch:
+
+env:
+  DIAS_MINIMOS: 60
+
+jobs:
+  checar:
+    runs-on: ubuntu-latest
+    environment: Databricks
+    permissions:
+      contents: read
+
+    steps:
+      - uses: databricks/setup-cli@v1.16.1
+
+      # `tokens list` devolve TODOS os PATs do usuario chamador - inclusive o
+      # do repo de producao, que vive noutro repo. Um check cobre os dois.
+      - name: PATs do Databricks
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          databricks tokens list -o json > tokens.json
+          python - <<'PY'
+          import datetime, json, os, sys
+
+          limite = int(os.environ["DIAS_MINIMOS"])
+          agora = datetime.datetime.now(datetime.timezone.utc)
+          dados = json.load(open("tokens.json"))
+          tokens = dados if isinstance(dados, list) else dados.get("token_infos", [])
+
+          problemas = []
+          for t in tokens:
+              exp = t.get("expiry_time")
+              rotulo = f"{t.get('token_id','?')[:8]} ({t.get('comment') or 'sem comentario'})"
+              if exp in (None, -1):
+                  print(f"  {rotulo}: sem expiracao")
+                  continue
+              dias = (datetime.datetime.fromtimestamp(exp / 1000, datetime.timezone.utc) - agora).days
+              print(f"  {rotulo}: {dias} dias")
+              if dias < limite:
+                  problemas.append(f"{rotulo} expira em {dias} dias")
+
+          for p in problemas:
+              print(f"::error::PAT do Databricks {p}")
+          sys.exit(1 if problemas else 0)
+          PY
+
+      # PAT do GitHub que dispara o repo de controle. Expirou = tag promovida
+      # nao chega em producao, e o push da tag fica verde do mesmo jeito.
+      - name: PAT de dispatch do GitHub
+        env:
+          TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
+        run: |
+          validade=$(curl -sI -H "Authorization: Bearer $TOKEN" https://api.github.com/user \
+            | tr -d '\r' | grep -i '^github-authentication-token-expiration:' | cut -d' ' -f2-)
+          if [ -z "$validade" ]; then
+            echo "PRD_DISPATCH_TOKEN: sem data de expiracao declarada"
+            exit 0
+          fi
+          dias=$(( ( $(date -d "$validade" +%s) - $(date +%s) ) / 86400 ))
+          echo "PRD_DISPATCH_TOKEN: $dias dias (expira $validade)"
+          if [ "$dias" -lt "$DIAS_MINIMOS" ]; then
+            echo "::error::PRD_DISPATCH_TOKEN expira em $dias dias"
+            exit 1
+          fi
