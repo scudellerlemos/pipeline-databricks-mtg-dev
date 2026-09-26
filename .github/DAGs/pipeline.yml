@@ -9,14 +9,28 @@ resources:
     MTG_PIPELINE:
       name: MTG_PIPELINE
       description: "Orquestrador: Stage -> Bronze -> Silver -> Gold"
+      # Run normal leva ~20min. 4h e "travou": cluster que nao sobe ou task
+      # pendurada num read do Scryfall. Sem isso um run agendado fica RUNNING
+      # pra sempre e o on_failure (injetado pelo deploy) nunca dispara.
+      timeout_seconds: 14400
       schedule:
         # Executa 1x/mes, na 1a segunda-feira do mes, as 6h (Quartz: "2#1" =
         # dia-da-semana 2 (segunda) ocorrencia #1 no mes)
         quartz_cron_expression: "0 0 6 ? * 2#1"
         timezone_id: America/Sao_Paulo
-        pause_status: UNPAUSED
+        # PAUSED e o default de proposito: quem carrega o schedule e producao,
+        # que sobe com MTG_PAUSE_STATUS=UNPAUSED. Dev e prd dividem o mesmo
+        # Scryfall - os dois agendados seria bater na API duas vezes pelo mesmo
+        # dado. Dev roda sob demanda, quando alguem esta mexendo.
+        pause_status: PAUSED
       tasks:
         - task_key: rodar_stage
+          # Unica task que depende de rede externa (Scryfall). 503 no meio de
+          # um bulk download e a falha mais provavel do pipeline inteiro e a
+          # mais barata de resolver sozinha. As camadas seguintes NAO tem
+          # retry de proposito: erro delas e bug ou DQ, e retry so repete.
+          max_retries: 2
+          min_retry_interval_millis: 300000
           run_job_task:
             job_id: "{{MTG_STAGE_JOB_ID}}"
 
