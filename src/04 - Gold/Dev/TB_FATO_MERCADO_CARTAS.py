@@ -10,12 +10,26 @@ mercado de cartas, sem precisar conhecer Bronze/Silver.
 GRAO: uma linha por cotação de preço de uma impressão de carta
 (ID_CARTA, DT_COTACAO). Chave: (ID_CARTA, DT_COTACAO).
 
+TAMANHO ESPERADO: ~1 linha por impressão por data de coleta, ou seja
+TB_FATO_CARTAS x número de coletas já acumuladas - a tabela cresce ~1x
+TB_FATO_CARTAS por run. Não há fan-out: carta e preço estão no mesmo grão de
+impressão e o join é 1:1 por ID_CARTA. As três tabelas LEFT restantes são
+agregadas ou deduplicadas antes do join pelo mesmo motivo. A premissa é
+verificada de verdade em _declare_primary_key (gold_utils.py), que aborta a
+run se (ID_CARTA, DT_COTACAO) repetir ou vier NULA.
+
+VLR_USD/EUR/TIX são o preço DAQUELA impressão, não do nome da carta - uma
+reimpressão barata e um original caro são linhas distintas com valores
+distintos, que é o que torna SUM/AVG por coleção ou raridade legítimo aqui.
+As colunas _FOIL/_ETCHED são outra cotação da MESMA impressão (foil vale
+múltiplos do não-foil), por isso são colunas e não linhas - um SUM(VLR_USD)
+ignora o valor foil da coleção - some VLR_USD_FOIL à parte se quiser ele.
+
 TABELAS SILVER USADAS (5 de 6):
 - TB_FATO_CARTAS (driver): 1 linha por impressão de carta.
-- TB_FATO_PRECOS_CARTAS (INNER JOIN por NME_CARTA): histórico de cotação de
-  preço, mesmo grão de junção já documentado na origem (ver docstring de
-  TB_FATO_PRECOS_CARTAS.py: "quem precisar combinar carta com preco faz o
-  join na Gold por NME_CARTA"). INNER porque DT_COTACAO é parte da chave
+- TB_FATO_PRECOS_CARTAS (INNER JOIN por ID_CARTA): histórico de cotação de
+  preço no mesmo grão de impressão desta tabela, juntável 1:1 (ver docstring
+  de TB_FATO_PRECOS_CARTAS.py). INNER porque DT_COTACAO é parte da chave
   desta tabela Gold - carta sem nenhuma cotação de preço não tem linha
   possível aqui (não há valor artificial pra DT_COTACAO sem mascarar a
   chave). Ver seção de Data Quality abaixo para a contagem de cartas
@@ -112,11 +126,26 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
     qtd_cartas_sem_cotacao = spark.sql("""
         SELECT COUNT(DISTINCT c.ID_CARTA)
         FROM _cartas c
-        LEFT JOIN _precos p ON c.NME_CARTA = p.NME_CARTA
-        WHERE p.NME_CARTA IS NULL
+        LEFT JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
+        WHERE p.ID_CARTA IS NULL
     """).collect()[0][0] or 0
     nivel = "⚠️" if qtd_cartas_sem_cotacao > 0 else "✅"
     print(f"{nivel} DQ [pré-join] cartas_excluidas_sem_cotacao_de_preco: {qtd_cartas_sem_cotacao}")
+
+    # DATA QUALITY - lado espelho: preço de impressão que não está em
+    # TB_FATO_CARTAS. card_prices filtra por releaseDate e cards filtra por
+    # código de coleção (/sets), então token, promo e art series entram no preço
+    # e não na carta. São mantidos de propósito na Silver - cotação é o único
+    # dado não reproduzível do pipeline, carta volta inteira em toda run - mas o
+    # INNER JOIN abaixo os exclui, então a contagem fica logada em vez de sumir.
+    qtd_precos_sem_carta = spark.sql("""
+        SELECT COUNT(DISTINCT p.ID_CARTA)
+        FROM _precos p
+        LEFT JOIN _cartas c ON p.ID_CARTA = c.ID_CARTA
+        WHERE c.ID_CARTA IS NULL
+    """).collect()[0][0] or 0
+    nivel = "⚠️" if qtd_precos_sem_carta > 0 else "✅"
+    print(f"{nivel} DQ [pré-join] precos_excluidos_sem_carta: {qtd_precos_sem_carta}")
 
     spark.sql("""
         CREATE OR REPLACE TEMP VIEW _esclarecimentos_agg AS
@@ -163,7 +192,10 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
             COALESCE(col.DT_LANCAMENTO, DATE'1001-01-01') AS DT_LANCAMENTO_COLECAO,
             p.DT_INGESTAO AS DT_COTACAO,
             p.VLR_USD,
+            p.VLR_USD_FOIL,
+            p.VLR_USD_ETCHED,
             p.VLR_EUR,
+            p.VLR_EUR_FOIL,
             p.VLR_TIX,
             COALESCE(e.QTD_ESCLARECIMENTOS, 0) AS QTD_ESCLARECIMENTOS,
             COALESCE(e.DT_ULTIMO_ESCLARECIMENTO, DATE'1001-01-01') AS DT_ULTIMO_ESCLARECIMENTO,
@@ -172,7 +204,7 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
             YEAR(p.DT_INGESTAO) AS ANO_COTACAO,
             MONTH(p.DT_INGESTAO) AS MES_COTACAO
         FROM _cartas c
-        INNER JOIN _precos p ON c.NME_CARTA = p.NME_CARTA
+        INNER JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
         LEFT JOIN _colecoes col ON c.COD_COLECAO = col.COD_COLECAO
         LEFT JOIN _esclarecimentos_agg e ON c.ID_ORACLE = e.ID_ORACLE
         LEFT JOIN _migracoes_resolvidas mig ON c.ID_CARTA = mig.ID_CARTA_ANTIGO
@@ -240,7 +272,8 @@ dq_resultados = run_data_quality_checks(spark, full_table_name, {
     "fk_null_id_oracle": f"SELECT COUNT(*) FROM {full_table_name} WHERE ID_ORACLE IS NULL",
     "fk_colecao_nao_encontrada": f"SELECT COUNT(*) FROM {full_table_name} WHERE NME_COLECAO = 'Nao_Identificado'",
     "valor_negativo_preco": f"""SELECT COUNT(*) FROM {full_table_name}
-        WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0""",
+        WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0
+           OR VLR_USD_FOIL < 0 OR VLR_USD_ETCHED < 0 OR VLR_EUR_FOIL < 0""",
     "null_residual_categorico": f"""SELECT COUNT(*) FROM {full_table_name}
         WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
            OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL

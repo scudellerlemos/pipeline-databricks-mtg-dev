@@ -32,7 +32,7 @@ COMMON_COLUMNS = {
 
 SILVER_TABLES = {
     "TB_FATO_CARTAS": {
-        "comment": "Catálogo de cartas de Magic: The Gathering - uma linha por impressão/edição de carta, pronta para análise de gameplay, deckbuilding e coleção. Responde 'o que é essa carta': texto de regras, custo de mana, tipo, raridade, artista e em qual coleção ela saiu. Preço e histórico de migração de id ficam em tabelas próprias (TB_FATO_PRECOS_CARTAS, TB_MOV_MIGRACOES_CARTAS) - junte por NME_CARTA/ID_CARTA quando precisar combinar.",
+        "comment": "Catálogo de cartas de Magic: The Gathering - uma linha por impressão/edição de carta, pronta para análise de gameplay, deckbuilding e coleção. Responde 'o que é essa carta': texto de regras, custo de mana, tipo, raridade, artista e em qual coleção ela saiu. Preço e histórico de migração de id ficam em tabelas próprias (TB_FATO_PRECOS_CARTAS, TB_MOV_MIGRACOES_CARTAS) - junte por ID_CARTA quando precisar combinar.",
         "columns": {
             "ID_CARTA": "Id único da impressão desta carta. Preservado como veio da fonte - nunca reatribuído, mesmo quando a Scryfall unifica cartas (ver TB_MOV_MIGRACOES_CARTAS para o id canônico pós-migração).",
             "ID_ORACLE": "Identificador da carta estável entre todas as suas impressões (diferentes edições da mesma carta compartilham este id). Use para agrupar todas as versões de uma carta.",
@@ -92,17 +92,21 @@ SILVER_TABLES = {
         },
     },
     "TB_FATO_PRECOS_CARTAS": {
-        "comment": "Histórico de cotações de preço de cartas de Magic: The Gathering em dólar, euro e MTGO ticket - uma linha por coleta de preço. Use para acompanhar valorização/desvalorização de uma carta ao longo do tempo, comparar preço entre cartas/coleções ou montar um indicador de valor de coleção. A mesma carta tem várias linhas (uma por coleta) de propósito - é histórico, não é 'o preço atual'.",
+        "comment": "Histórico de cotações de preço de cartas de Magic: The Gathering em dólar, euro e MTGO ticket - uma linha por coleta de preço de uma impressão. Preço varia por impressão: a mesma carta reimpressa em outra coleção vale outro valor, e cada impressão tem sua própria cotação aqui. Use para acompanhar valorização/desvalorização ao longo do tempo, comparar preço entre impressões/coleções ou montar um indicador de valor de coleção. A mesma impressão tem várias linhas (uma por coleta) de propósito - é histórico, não é 'o preço atual'.",
         "columns": {
-            "NME_CARTA": "Carta a que esta cotação de preço se refere. Uma cotação se aplica a todas as impressões da carta com este nome - junte com TB_FATO_CARTAS.NME_CARTA.",
-            "COD_COLECAO": "Coleção/edição de referência usada nesta coleta de preço.",
-            "NME_RARIDADE": "Raridade de referência usada nesta coleta de preço.",
+            "ID_CARTA": "Impressão de carta a que esta cotação se refere - junte com TB_FATO_CARTAS.ID_CARTA (1:1 por impressão). Junto com DT_INGESTAO, forma a chave única desta tabela.",
+            "NME_CARTA": "Nome da carta cotada. Não é chave: o mesmo nome aparece em várias impressões, cada uma com seu próprio preço.",
+            "COD_COLECAO": "Coleção/edição desta impressão cotada.",
+            "NME_RARIDADE": "Raridade desta impressão cotada.",
             "VLR_USD": "Preço em dólares americanos. NULO significa que não havia cotação em dólar nesta coleta, não que a carta vale zero.",
+            "VLR_USD_FOIL": "Preço em dólares da versão foil da MESMA impressão - foil é outra cotação da mesma carta, não outra impressão, e costuma valer várias vezes o não-foil. NULO significa que essa impressão não tem foil ou não tinha cotação nesta coleta.",
+            "VLR_USD_ETCHED": "Preço em dólares da versão etched foil da mesma impressão. NULO na maioria esmagadora das cartas - poucos sets tiveram etched.",
             "VLR_EUR": "Preço em euros. NULO significa que não havia cotação em euro nesta coleta, não que a carta vale zero.",
+            "VLR_EUR_FOIL": "Preço em euros da versão foil da mesma impressão. NULO significa que essa impressão não tem foil ou não tinha cotação nesta coleta.",
             "VLR_TIX": "Preço em MTGO tickets (moeda do Magic Online). NULO significa que não havia cotação em tix nesta coleta, não que a carta vale zero.",
             "URL_SCRYFALL": "Endereço da página desta carta na Scryfall.",
-            "URL_IMAGEM": "Endereço da imagem de referência usada nesta coleta de preço.",
-            "DT_LANCAMENTO": "Data de lançamento da coleção de referência usada nesta coleta de preço.",
+            "URL_IMAGEM": "Endereço da imagem desta impressão cotada.",
+            "DT_LANCAMENTO": "Data de lançamento da coleção desta impressão cotada.",
             "ANO_INGESTAO": "Ano da coleta de preço - usado só para particionamento físico da tabela.",
             "MES_INGESTAO": "Mês da coleta de preço - usado só para particionamento físico da tabela.",
         },

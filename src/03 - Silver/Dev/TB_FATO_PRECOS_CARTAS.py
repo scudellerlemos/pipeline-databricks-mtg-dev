@@ -6,24 +6,29 @@
 Script Python para processamento da tabela TB_FATO_PRECOS_CARTAS.
 Transformacao e limpeza de dados da Bronze para Silver.
 
-CLASSIFICACAO DAMA-DMBOK: Fato - uma linha por coleta de preco de uma carta
-(grao), com medidas quantitativas (VLR_USD/VLR_EUR/VLR_TIX). Fato
-independente de TB_FATO_CARTAS - quem precisar combinar carta com preco faz
-o join na Gold por NME_CARTA (ver docstring de TB_FATO_CARTAS).
+CLASSIFICACAO DAMA-DMBOK: Fato - uma linha por coleta de preco de uma
+IMPRESSAO de carta (grao), com medidas quantitativas
+(VLR_USD/VLR_USD_FOIL/VLR_USD_ETCHED/VLR_EUR/VLR_EUR_FOIL/VLR_TIX). A
+fonte cota cada variante fisica da mesma impressao separadamente (foil chega
+a valer multiplos do nao-foil), entao as variantes sao COLUNAS da mesma
+linha, nao linhas novas - o grao continua sendo a impressao.
+Fato independente de TB_FATO_CARTAS - quem
+precisar combinar carta com preco faz o join na Gold por ID_CARTA.
 
-GRAO PROPRIO: cards (Bronze cards) e precos (Bronze card_prices) vem de
-fontes diferentes, com grao diferente - cards e por IMPRESSAO (ID_CARTA),
-preco e por NOME (a Scryfall so responde preco por
-/cards/named?exact=<name>, sem granularidade de impressao). Cada Fato fica
-no seu proprio grao natural em vez de forcar ID_CARTA a carregar
-DT_INGESTAO_PRECO na chave.
+GRAO: mesmo grao de TB_FATO_CARTAS (impressao), mais a data da coleta.
+Preco em Magic varia por impressao - o Lightning Bolt tem ~70 delas, de
+menos de 1 USD a centenas - entao o preco por NOME nao existe como numero
+unico. A Stage ingere o bulk default_cards (1 objeto por impressao, cada um
+com seu proprio `prices`), por isso ID_CARTA chega ate aqui e o join com
+TB_FATO_CARTAS e 1:1 por impressao, sem fan-out.
 
-CHAVE UNICA: NME_CARTA + DT_INGESTAO (ver save_silver_table no fim do
-notebook). A Bronze card_prices guarda so o preco mais recente por nome
-(merge upsert por nome, sem historico proprio) - mas como esse "mais
-recente" muda de data a cada execucao, cada run acrescenta uma nova linha
-na Silver em vez de sobrescrever, e e assim que o historico diario de preco
-se acumula aqui.
+CHAVE UNICA: ID_CARTA + DT_INGESTAO (ver save_silver_table no fim do
+notebook). A Bronze card_prices e APPEND-only - sem MERGE/upsert e sem
+deduplicacao por chave de negocio (ver cabecalho de card_prices.py) - entao
+cada execucao acrescenta la a cotacao daquele dia e o historico ja nasce na
+Bronze. A Silver preserva esse historico: cada run acrescenta uma nova linha
+em vez de sobrescrever, e e assim que o historico diario de preco se acumula
+aqui.
 
 CONVENCAO DE NOME/CASE DE COLUNA: mesma de TB_FATO_CARTAS
 (ver docstring de la) - nome de coluna 100% MAIUSCULO, valor de atributo em
@@ -86,11 +91,15 @@ def transform_card_prices_silver(df):
     # significa "sem cotacao encontrada", nao "vale zero".
     df_final = spark.sql("""
         SELECT
+            id AS ID_CARTA,
             name AS NME_CARTA,
             upper(`set`) AS COD_COLECAO,
             rarity AS NME_RARIDADE,
             cast(usd AS float) AS VLR_USD,
+            cast(usd_foil AS float) AS VLR_USD_FOIL,
+            cast(usd_etched AS float) AS VLR_USD_ETCHED,
             cast(eur AS float) AS VLR_EUR,
+            cast(eur_foil AS float) AS VLR_EUR_FOIL,
             cast(tix AS float) AS VLR_TIX,
             scryfall_uri AS URL_SCRYFALL,
             image_url AS URL_IMAGEM,
@@ -136,17 +145,17 @@ df_bronze = processor.extract_from_bronze("card_prices")
 # Aplicar transformacao especifica
 df_silver = processor.transform_data(df_bronze, transform_card_prices_silver)
 
-# Salvar na Silver com merge incremental por NME_CARTA + DT_INGESTAO (ver
-# docstring da celula anterior - historico diario de preco).
+# Salvar na Silver com merge incremental por ID_CARTA + DT_INGESTAO (ver
+# docstring da celula anterior - historico diario de preco por impressao).
 # Sem order_by_col: DT_INGESTAO ja esta na propria key_column, entao dentro
 # de uma particao do dedup ela e constante - usa-la como criterio de recencia
-# nao desempata nada (zero variancia). Duplicatas reais de (NME_CARTA,
-# DT_INGESTAO) sao indistinguiveis aqui (mesma carta, mesma coleta exata) -
-# dropDuplicates padrao resolve sem custo extra de Window/hash.
+# nao desempata nada (zero variancia). Duplicatas reais de (ID_CARTA,
+# DT_INGESTAO) sao indistinguiveis aqui (mesma impressao, mesma coleta
+# exata) - dropDuplicates padrao resolve sem custo extra de Window/hash.
 processor.save_silver_table(
     df_silver,
     partition_cols=["ANO_INGESTAO", "MES_INGESTAO"],
-    key_column=["NME_CARTA", "DT_INGESTAO"],
+    key_column=["ID_CARTA", "DT_INGESTAO"],
     table_comment=get_table_comment("TB_FATO_PRECOS_CARTAS"),
     column_comments=get_column_comments("TB_FATO_PRECOS_CARTAS")
 )
