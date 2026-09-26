@@ -29,16 +29,38 @@ except NameError:
         pass
 
 
-def secret_scope():
-    """Scope de secret do ambiente atual.
+def config_override(secret_name):
+    """Valor por ambiente, vindo de env var, ou None.
 
-    dev e prd dividem o mesmo workspace, entao o que separa os dois e de qual
-    scope saem catalog_name / s3_bucket / prefixos. A env var vem de
-    spark_env_vars no cluster, injetada pelo deploy.py conforme o alvo - o YAML
-    do job e identico nos dois repos de proposito.
+    dev e prd dividem workspace E scope de secret: o scope guarda so o que e
+    igual nos dois. O que difere (catalogo, prefixos de S3) chega como env var
+    injetada em spark_env_vars pelo deploy.py, entao a config de producao fica
+    versionada no workflow em vez de invisivel num scope.
+
+    Precedencia: env var > secret > default do codigo. Nenhuma dessas chaves e
+    segredo de verdade - sao config - por isso duplicar o scope inteiro so pra
+    mudar tres valores seria criar sete valores pra manter em sincronia na mao.
     """
-    return os.environ.get("MTG_SECRET_SCOPE", "mtg-pipeline")
+    return os.environ.get("MTG_" + secret_name.upper()) or None
 
+
+def _barra_catalogo_de_dev_em_producao(secret_name, value):
+    """Producao nunca pode resolver o catalogo pra mtg_dev.
+
+    ponytail: os dois ambientes vivem no mesmo workspace, entao esquecer de
+    injetar MTG_CATALOG_NAME faria o job de producao gravar por cima das
+    tabelas de desenvolvimento - task verde, dado destruido. Explode aqui.
+    """
+    if (
+        secret_name == "catalog_name"
+        and os.environ.get("MTG_ENVIRONMENT") == "production"
+        and value == "mtg_dev"
+    ):
+        raise Exception(
+            "catalog_name resolveu para mtg_dev com MTG_ENVIRONMENT=production - "
+            "injete MTG_CATALOG_NAME no alvo de deploy"
+        )
+    return value
 
 # ============================================================================
 # INICIALIZAÇÃO PARA DATABRICKS
@@ -98,9 +120,16 @@ def get_secret(secret_name, default_value=None, extra_safe_defaults=None):
     Raises:
         Exception: Se secret obrigatório não for encontrado e sem default
     """
+    override = config_override(secret_name)
+    if override:
+        print(f"Config '{secret_name}' veio do ambiente: {override}")
+        return _barra_catalogo_de_dev_em_producao(secret_name, override)
+
     try:
-        return dbutils.secrets.get(scope=secret_scope(), key=secret_name)
-    except:
+        return _barra_catalogo_de_dev_em_producao(
+            secret_name, dbutils.secrets.get(scope="mtg-pipeline", key=secret_name)
+        )
+    except Exception:
         if default_value is not None:
             print(f"Secret '{secret_name}' não encontrado, usando valor padrão: {default_value}")
             return default_value
@@ -108,17 +137,12 @@ def get_secret(secret_name, default_value=None, extra_safe_defaults=None):
         # ponytail: s3_bucket não entra em safe_defaults de propósito - é o
         # destino real de escrita/leitura de todas as camadas, então preferimos
         # falhar alto a gravar silenciosamente num bucket placeholder inexistente.
-        # ponytail: o default de catalog_name so vale no scope de dev. Em prd,
-        # secret faltando tem que explodir - cair pra mtg_dev faria um job de
-        # producao gravar por cima das tabelas de desenvolvimento, em silencio.
-        safe_defaults = (
-            {'catalog_name': 'mtg_dev'} if secret_scope() == "mtg-pipeline" else {}
-        )
+        safe_defaults = {'catalog_name': 'mtg_dev'}
         safe_defaults.update(extra_safe_defaults or {})
 
         if secret_name in safe_defaults:
             print(f"Secret '{secret_name}' não encontrado, usando valor padrão: {safe_defaults[secret_name]}")
-            return safe_defaults[secret_name]
+            return _barra_catalogo_de_dev_em_producao(secret_name, safe_defaults[secret_name])
         else:
             print(f"⚠️ Secret '{secret_name}' não encontrado e sem valor padrão")
             print(f"💡 Configure o secret ou use create_manual_config()")

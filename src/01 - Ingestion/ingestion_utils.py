@@ -40,20 +40,24 @@ except NameError:
         pass
 
 
-def secret_scope():
-    """Scope de secret do ambiente atual.
+def config_override(secret_name):
+    """Valor por ambiente, vindo de env var, ou None.
 
-    dev e prd dividem o mesmo workspace, entao o que separa os dois e de qual
-    scope saem catalog_name / s3_bucket / prefixos. A env var vem de
-    spark_env_vars no cluster, injetada pelo deploy.py conforme o alvo - o YAML
-    do job e identico nos dois repos de proposito.
+    Stage nao importa base_utils (camadas separadas, cada uma com seu %run),
+    entao a precedencia env var > secret > default precisa existir aqui
+    tambem - senao o Stage de prd grava no prefixo de S3 do dev.
     """
-    return os.environ.get("MTG_SECRET_SCOPE", "mtg-pipeline")
+    return os.environ.get("MTG_" + secret_name.upper()) or None
 
 
 def get_secret(secret_name, default_value=None):
+    override = config_override(secret_name)
+    if override:
+        print(f"Config '{secret_name}' veio do ambiente: {override}")
+        return override
+
     try:
-        return dbutils.secrets.get(scope=secret_scope(), key=secret_name)
+        return dbutils.secrets.get(scope="mtg-pipeline", key=secret_name)
     except Exception:
         if default_value is not None:
             print(f"Segredo '{secret_name}' não encontrado, usando valor padrão")

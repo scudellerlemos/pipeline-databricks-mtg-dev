@@ -47,31 +47,40 @@ def test_s3_bucket_has_no_silent_fallback():
         raise AssertionError("expected Exception for s3_bucket with no default")
 
 
-def test_scope_padrao_e_o_de_dev():
-    assert base_utils.secret_scope() == "mtg-pipeline"
-
-
-def test_scope_vem_da_env_var():
-    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+def test_env_var_vence_o_secret_e_o_default():
+    # Precedencia env var > secret > default: e assim que prd sobrescreve so o
+    # que difere, em vez de duplicar o scope inteiro. Nenhuma dessas chaves e
+    # segredo - sao config (bucket, prefixo, URL publica).
+    os.environ["MTG_CATALOG_NAME"] = "mtg_prod"
     try:
-        assert base_utils.secret_scope() == "mtg-pipeline-prd"
+        assert base_utils.get_secret("catalog_name") == "mtg_prod"
     finally:
-        del os.environ["MTG_SECRET_SCOPE"]
+        del os.environ["MTG_CATALOG_NAME"]
 
 
-def test_catalog_name_nao_cai_pra_mtg_dev_fora_do_scope_de_dev():
-    # O desastre que isso trava: dev e prd dividem o mesmo workspace, entao um
-    # secret faltando no scope de prd fazia o job de producao gravar por cima
-    # das tabelas de mtg_dev - em silencio, sem task vermelha.
-    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+def test_producao_sem_catalogo_injetado_explode():
+    # O desastre que isso trava: dev e prd dividem o mesmo workspace, entao
+    # esquecer de injetar MTG_CATALOG_NAME faria o job de producao gravar por
+    # cima das tabelas de mtg_dev - task verde, dado destruido.
+    os.environ["MTG_ENVIRONMENT"] = "production"
     try:
         base_utils.get_secret("catalog_name")
     except Exception as e:
-        assert "catalog_name" in str(e)
+        assert "mtg_dev" in str(e)
     else:
-        raise AssertionError("catalog_name nao pode cair pra mtg_dev fora de dev")
+        raise AssertionError("producao nao pode resolver o catalogo pra mtg_dev")
     finally:
-        del os.environ["MTG_SECRET_SCOPE"]
+        del os.environ["MTG_ENVIRONMENT"]
+
+
+def test_producao_com_catalogo_injetado_passa():
+    os.environ["MTG_ENVIRONMENT"] = "production"
+    os.environ["MTG_CATALOG_NAME"] = "mtg_prod"
+    try:
+        assert base_utils.get_secret("catalog_name") == "mtg_prod"
+    finally:
+        del os.environ["MTG_ENVIRONMENT"]
+        del os.environ["MTG_CATALOG_NAME"]
 
 
 if __name__ == "__main__":
@@ -81,7 +90,7 @@ if __name__ == "__main__":
     test_falls_back_to_layer_specific_default()
     test_raises_when_no_default_available()
     test_s3_bucket_has_no_silent_fallback()
-    test_scope_padrao_e_o_de_dev()
-    test_scope_vem_da_env_var()
-    test_catalog_name_nao_cai_pra_mtg_dev_fora_do_scope_de_dev()
+    test_env_var_vence_o_secret_e_o_default()
+    test_producao_sem_catalogo_injetado_explode()
+    test_producao_com_catalogo_injetado_passa()
     print("OK")

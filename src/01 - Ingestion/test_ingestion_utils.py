@@ -244,16 +244,17 @@ def test_run_timestamp_e_constante_entre_chamadas():
     assert ingestion_utils._run_timestamp(None) is not None
 
 
-def test_secret_scope_vem_da_env_var():
+def test_env_var_sobrescreve_o_prefixo_de_stage():
     # Stage nao importa base_utils (camadas separadas, cada uma com seu %run),
-    # entao o scope por ambiente tem que existir nos dois - se este aqui ficar
-    # pra tras, o Stage de prd le os secrets de dev.
-    assert ingestion_utils.secret_scope() == "mtg-pipeline"
-    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+    # entao a precedencia env var > secret > default tem que existir nos dois.
+    # Sem isso o Stage de prd grava no mesmo prefixo de S3 do dev - e Stage
+    # escreve fora do Unity Catalog, entao catalogo diferente nao separa nada.
+    assert ingestion_utils.config_override("s3_stage_prefix") is None
+    os.environ["MTG_S3_STAGE_PREFIX"] = "prod/stage"
     try:
-        assert ingestion_utils.secret_scope() == "mtg-pipeline-prd"
+        assert ingestion_utils.get_secret("s3_stage_prefix", "stage") == "prod/stage"
     finally:
-        del os.environ["MTG_SECRET_SCOPE"]
+        del os.environ["MTG_S3_STAGE_PREFIX"]
 
 
 if __name__ == "__main__":
@@ -272,5 +273,5 @@ if __name__ == "__main__":
     test_run_stage_ingestion_none_df_propaga_erro_do_save()
     test_run_stage_ingestion_exception_marks_failed_and_reraises()
     test_run_timestamp_e_constante_entre_chamadas()
-    test_secret_scope_vem_da_env_var()
+    test_env_var_sobrescreve_o_prefixo_de_stage()
     print("OK")

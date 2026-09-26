@@ -38,8 +38,6 @@ JSON_TMP = "job_deploy.json"
 TARGET = {
     # sufixo no nome do job: "" em dev, "_PRD" em producao
     "suffix": os.environ.get("MTG_JOB_SUFFIX", ""),
-    # scope de secret de onde o notebook le catalog_name / bucket / prefixos
-    "secret_scope": os.environ.get("MTG_SECRET_SCOPE", ""),
     "git_url": os.environ.get("MTG_GIT_URL", ""),
     # tag imutavel: producao roda exatamente o codigo promovido e rollback e
     # redeployar a tag anterior. Vazio = fica no git_branch do YAML.
@@ -51,18 +49,40 @@ TARGET = {
 }
 
 
+# Env vars MTG_* que sao knobs DESTE script: mexem no job, nao na execucao do
+# notebook, entao nao tem por que chegar no cluster.
+KNOBS_DO_DEPLOY = {"MTG_JOB_SUFFIX", "MTG_GIT_URL", "MTG_GIT_TAG", "MTG_PAUSE_STATUS"}
+
+
 def job_name(job_key):
     return job_key + TARGET["suffix"]
 
 
+# Env vars MTG_* que o cluster precisa enxergar. Lido no import, junto do
+# TARGET: os dois sao o retrato do ambiente em que o deploy rodou.
+#
+# get_secret() no notebook resolve na ordem env var > secret > default, e as
+# chaves do scope nao sao segredo nenhum (bucket, prefixo, URL publica) - sao
+# config. Entao dev e prd dividem um scope so, com o que e igual, e o que
+# difere viaja por aqui: fica versionado no workflow em vez de invisivel.
+#
+# MTG_ENVIRONMENT vai junto de proposito - e o que arma, no get_secret, a
+# trava que impede producao de resolver o catalogo pra mtg_dev.
+CONFIG_DO_AMBIENTE = {
+    k: v
+    for k, v in os.environ.items()
+    if k.startswith("MTG_") and k not in KNOBS_DO_DEPLOY and v
+}
+
+
 def apply_target(job_config):
-    """Aplica o alvo (nome, scope, git ref, tag, schedule) no job lido do YAML."""
+    """Aplica o alvo (nome, config, git ref, tag, schedule) no job do YAML."""
     job_config["name"] = job_name(job_config["name"])
 
-    if TARGET["secret_scope"]:
+    if CONFIG_DO_AMBIENTE:
         for cluster in job_config.get("job_clusters", []):
             env_vars = cluster.setdefault("new_cluster", {}).setdefault("spark_env_vars", {})
-            env_vars["MTG_SECRET_SCOPE"] = TARGET["secret_scope"]
+            env_vars.update(CONFIG_DO_AMBIENTE)
 
     git_source = job_config.get("git_source")
     if git_source:
