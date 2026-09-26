@@ -28,6 +28,79 @@ DEPLOY_ORDER = [
 
 JSON_TMP = "job_deploy.json"
 
+# ---------------------------------------------------------------------------
+# ALVO DE DEPLOY
+# ---------------------------------------------------------------------------
+# dev e prd dividem o mesmo workspace e o MESMO codigo - o repo de prd nao tem
+# copia de nada, ele so faz checkout deste repo numa tag e chama este script.
+# Entao nada que diferencia os dois pode estar escrito no YAML: vem de env var
+# do workflow e e injetado no job antes do POST.
+TARGET = {
+    # sufixo no nome do job: "" em dev, "_PRD" em producao
+    "suffix": os.environ.get("MTG_JOB_SUFFIX", ""),
+    "git_url": os.environ.get("MTG_GIT_URL", ""),
+    # tag imutavel: producao roda exatamente o codigo promovido e rollback e
+    # redeployar a tag anterior. Vazio = fica no git_branch do YAML.
+    "git_tag": os.environ.get("MTG_GIT_TAG", ""),
+    "environment": os.environ.get("MTG_ENVIRONMENT", ""),
+    # jobs reset sobrescreve as settings inteiras, entao pausar pela UI nao
+    # sobrevive ao proximo deploy - tem que ser knob de alvo.
+    "pause_status": os.environ.get("MTG_PAUSE_STATUS", ""),
+}
+
+
+# Env vars MTG_* que sao knobs DESTE script: mexem no job, nao na execucao do
+# notebook, entao nao tem por que chegar no cluster.
+KNOBS_DO_DEPLOY = {"MTG_JOB_SUFFIX", "MTG_GIT_URL", "MTG_GIT_TAG", "MTG_PAUSE_STATUS"}
+
+
+def job_name(job_key):
+    return job_key + TARGET["suffix"]
+
+
+# Env vars MTG_* que o cluster precisa enxergar. Lido no import, junto do
+# TARGET: os dois sao o retrato do ambiente em que o deploy rodou.
+#
+# get_secret() no notebook resolve na ordem env var > secret > default, e as
+# chaves do scope nao sao segredo nenhum (bucket, prefixo, URL publica) - sao
+# config. Entao dev e prd dividem um scope so, com o que e igual, e o que
+# difere viaja por aqui: fica versionado no workflow em vez de invisivel.
+#
+# MTG_ENVIRONMENT vai junto de proposito - e o que arma, no get_secret, a
+# trava que impede producao de resolver o catalogo pra mtg_dev.
+CONFIG_DO_AMBIENTE = {
+    k: v
+    for k, v in os.environ.items()
+    if k.startswith("MTG_") and k not in KNOBS_DO_DEPLOY and v
+}
+
+
+def apply_target(job_config):
+    """Aplica o alvo (nome, config, git ref, tag, schedule) no job do YAML."""
+    job_config["name"] = job_name(job_config["name"])
+
+    if CONFIG_DO_AMBIENTE:
+        for cluster in job_config.get("job_clusters", []):
+            env_vars = cluster.setdefault("new_cluster", {}).setdefault("spark_env_vars", {})
+            env_vars.update(CONFIG_DO_AMBIENTE)
+
+    git_source = job_config.get("git_source")
+    if git_source:
+        if TARGET["git_url"]:
+            git_source["git_url"] = TARGET["git_url"]
+        if TARGET["git_tag"]:
+            # git_source aceita branch OU tag, nunca os dois
+            git_source.pop("git_branch", None)
+            git_source["git_tag"] = TARGET["git_tag"]
+
+    if TARGET["environment"]:
+        job_config.setdefault("tags", {})["environment"] = TARGET["environment"]
+
+    if TARGET["pause_status"] and "schedule" in job_config:
+        job_config["schedule"]["pause_status"] = TARGET["pause_status"]
+
+    return job_config
+
 
 def log(message, level="INFO"):
     """Função para logging padronizado"""
@@ -58,7 +131,7 @@ def load_job_config(yaml_path, job_key, job_ids_by_key=None):
                 if placeholder == token:
                     task["run_job_task"]["job_id"] = referenced_id
 
-    return job_config
+    return apply_target(job_config)
 
 
 def write_json(job_config):
@@ -136,11 +209,11 @@ def validate_databricks_connection():
 
 def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
     """Deploya (cria ou atualiza) um job e retorna seu job_id."""
-    log(f"📖 Lendo {yaml_path} ({job_key})...")
+    log(f"📖 Lendo {yaml_path} ({job_key} -> {job_name(job_key)})...")
     job_config = load_job_config(yaml_path, job_key, job_ids_by_key)
     write_json(job_config)
 
-    existing_id = get_existing_job_id(job_key, is_new_cli)
+    existing_id = get_existing_job_id(job_config["name"], is_new_cli)
 
     env = os.environ.copy()
     if not is_new_cli:
@@ -150,7 +223,7 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
         json_content = f.read()
 
     if existing_id:
-        log(f"🔄 Atualizando job existente: {job_key} (ID {existing_id})")
+        log(f"🔄 Atualizando job existente: {job_config['name']} (ID {existing_id})")
         if is_new_cli:
             write_json({"job_id": existing_id, "new_settings": job_config})
             result = subprocess.run(
@@ -164,7 +237,7 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
             )
         job_id = existing_id
     else:
-        log(f"🆕 Criando novo job: {job_key}")
+        log(f"🆕 Criando novo job: {job_config['name']}")
         if is_new_cli:
             result = subprocess.run(
                 ["databricks", "jobs", "create", "--json", f"@{JSON_TMP}"],
@@ -227,10 +300,10 @@ def verify_deployment():
 
         all_ok = True
         for _, job_key in DEPLOY_ORDER:
-            if job_key in names_found:
-                log(f"✅ {job_key} verificado")
+            if job_name(job_key) in names_found:
+                log(f"✅ {job_name(job_key)} verificado")
             else:
-                log(f"❌ {job_key} não encontrado após deploy", "ERROR")
+                log(f"❌ {job_name(job_key)} não encontrado após deploy", "ERROR")
                 all_ok = False
         return all_ok
     except Exception as e:

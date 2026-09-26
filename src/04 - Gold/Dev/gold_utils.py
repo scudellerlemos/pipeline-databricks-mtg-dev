@@ -85,7 +85,10 @@ def create_manual_config(catalog_name, s3_bucket, s3_gold_prefix=None):
         'schema_silver': "silver",
         'schema_gold': "gold",
         's3_bucket': s3_bucket,
-        's3_gold_prefix': s3_gold_prefix or "gold"
+        # get_secret e nao a string crua: prd e dev dividem o bucket, entao
+        # sem o override de S3_GOLD_PREFIX os dois gravariam Delta no mesmo
+        # caminho. O argumento explicito continua vencendo.
+        's3_gold_prefix': s3_gold_prefix or get_secret("s3_gold_prefix", "gold")
     }
 
 # ============================================================================
