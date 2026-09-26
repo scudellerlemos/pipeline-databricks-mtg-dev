@@ -53,7 +53,7 @@ jobs:
           python-version: '3.11'
 
       - name: Instalar dependências
-        run: pip install pyyaml==6.0.2 pytest==8.3.3 ruff==0.6.9
+        run: pip install pyyaml==6.0.2 pytest==8.3.3 ruff==0.6.9 requests==2.32.3
 
       # CLI nova (binario Go) pinada na mesma versao do repo de codigo.
       - name: Instalar Databricks CLI
