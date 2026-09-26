@@ -46,12 +46,21 @@ TARGET = {
     # jobs reset sobrescreve as settings inteiras, entao pausar pela UI nao
     # sobrevive ao proximo deploy - tem que ser knob de alvo.
     "pause_status": os.environ.get("MTG_PAUSE_STATUS", ""),
+    # Destino do alerta de falha. Vazio = job sobe sem email_notifications e o
+    # deploy avisa - run mensal que quebra as 6h da segunda nao avisa ninguem.
+    "alert_email": os.environ.get("MTG_ALERT_EMAIL", ""),
 }
 
 
 # Env vars MTG_* que sao knobs DESTE script: mexem no job, nao na execucao do
 # notebook, entao nao tem por que chegar no cluster.
-KNOBS_DO_DEPLOY = {"MTG_JOB_SUFFIX", "MTG_GIT_URL", "MTG_GIT_TAG", "MTG_PAUSE_STATUS"}
+KNOBS_DO_DEPLOY = {
+    "MTG_JOB_SUFFIX",
+    "MTG_GIT_URL",
+    "MTG_GIT_TAG",
+    "MTG_PAUSE_STATUS",
+    "MTG_ALERT_EMAIL",
+}
 
 
 def job_name(job_key):
@@ -98,6 +107,16 @@ def apply_target(job_config):
 
     if TARGET["pause_status"] and "schedule" in job_config:
         job_config["schedule"]["pause_status"] = TARGET["pause_status"]
+
+    # ponytail: vai em TODOS os jobs, sem excecao pro orquestrador. Uma falha
+    # de camada dentro do pipeline gera 2 emails (a camada e o orquestrador),
+    # mas o da camada e o que diz ONDE quebrou. Se virar barulho, filtre aqui
+    # por "schedule" in job_config.
+    if TARGET["alert_email"]:
+        job_config["email_notifications"] = {
+            "on_failure": [TARGET["alert_email"]],
+            "no_alert_for_skipped_runs": True,
+        }
 
     return job_config
 
@@ -181,6 +200,7 @@ def campos_criticos(settings):
       pause_status       schedule que voltou a ligar sozinho
       run_job_task_ids   orquestrador chamando job_id velho (a substituicao
                          de placeholder e feita na mao aqui, sem DAB)
+      alerta             job que perdeu o on_failure = falha mensal muda
     """
     git = settings.get("git_source") or {}
     env_vars = {}
@@ -192,6 +212,9 @@ def campos_criticos(settings):
         "git_ref": git.get("git_tag") or git.get("git_branch"),
         "pause_status": (settings.get("schedule") or {}).get("pause_status"),
         "config_do_ambiente": {k: v for k, v in env_vars.items() if k.startswith("MTG_")},
+        # or [] nos dois lados: a API devolve email_notifications: {} quando
+        # nao mandamos nada, e isso nao pode virar divergencia.
+        "alerta": (settings.get("email_notifications") or {}).get("on_failure") or [],
         "run_job_task_ids": sorted(
             str(t["run_job_task"].get("job_id"))
             for t in settings.get("tasks", [])
@@ -387,6 +410,8 @@ def cleanup():
 
 if __name__ == "__main__":
     log("🚀 Iniciando deploy do pipeline...")
+    if not TARGET["alert_email"]:
+        log("⚠️ MTG_ALERT_EMAIL vazio: os jobs sobem SEM alerta de falha", "WARN")
     log("=" * 60)
 
     try:

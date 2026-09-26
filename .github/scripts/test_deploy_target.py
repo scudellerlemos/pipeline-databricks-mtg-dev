@@ -21,6 +21,7 @@ ALVO_PRD = {
     "MTG_ENVIRONMENT": "production",
     "MTG_CATALOG_NAME": "mtg_prod",
     "MTG_S3_STAGE_PREFIX": "prod/stage",
+    "MTG_ALERT_EMAIL": "alerta@exemplo.com",
 }
 
 JOB_BASE = {
@@ -141,6 +142,37 @@ def test_orquestrador_sem_cluster_e_sem_git_nao_quebra():
 # ---------------------------------------------------------------------------
 
 
+def test_alerta_de_falha_e_injetado_em_todo_job():
+    # a run agendada e mensal e ninguem olha o workspace. Job sem on_failure
+    # significa que uma falha as 6h da primeira segunda so aparece em outubro.
+    deploy = _deploy_com_env(ALVO_PRD)
+    job = deploy.apply_target(copy.deepcopy(JOB_BASE))
+
+    assert job["email_notifications"]["on_failure"] == ["alerta@exemplo.com"]
+    # o knob nao pode virar env var do cluster - o notebook nunca le isso
+    assert "MTG_ALERT_EMAIL" not in job["job_clusters"][0]["new_cluster"]["spark_env_vars"]
+
+
+def test_sem_MTG_ALERT_EMAIL_o_job_sobe_sem_bloco_de_email():
+    # mandar on_failure: [""] pro Databricks e pior que nao mandar nada
+    deploy = _deploy_com_env({k: v for k, v in ALVO_PRD.items() if k != "MTG_ALERT_EMAIL"})
+    job = deploy.apply_target(copy.deepcopy(JOB_BASE))
+
+    assert "email_notifications" not in job
+
+
+def test_verificacao_pega_alerta_que_sumiu():
+    deploy = _deploy_com_env(ALVO_PRD)
+    enviado = deploy.apply_target(copy.deepcopy(JOB_BASE))
+
+    lido = copy.deepcopy(enviado)
+    lido["email_notifications"] = {}
+
+    assert deploy.diferencas(
+        deploy.campos_criticos(lido), deploy.campos_criticos(enviado)
+    ) == ["alerta: [] -> ['alerta@exemplo.com']"]
+
+
 def test_verificacao_pega_catalogo_que_nao_chegou_no_cluster():
     # o modo de falha que mais importa: job de prd sobe, task fica verde e
     # grava por cima do mtg_dev porque a env var nao chegou no cluster.
@@ -191,7 +223,8 @@ def test_deploy_identico_nao_acusa_nada():
     lido = copy.deepcopy(enviado)
     lido["format"] = "MULTI_TASK"
     lido["timeout_seconds"] = 0
-    lido["email_notifications"] = {}
+    # email_notifications NAO entra aqui: desde que o alerta e injetado, um {}
+    # vindo da API significa que o on_failure nao pegou - e divergencia real.
 
     assert deploy.diferencas(
         deploy.campos_criticos(lido), deploy.campos_criticos(enviado)
@@ -223,6 +256,9 @@ if __name__ == "__main__":
     test_tag_substitui_branch_e_nunca_convivem()
     test_pause_status_do_alvo_vence_o_yaml()
     test_orquestrador_sem_cluster_e_sem_git_nao_quebra()
+    test_alerta_de_falha_e_injetado_em_todo_job()
+    test_sem_MTG_ALERT_EMAIL_o_job_sobe_sem_bloco_de_email()
+    test_verificacao_pega_alerta_que_sumiu()
     test_verificacao_pega_catalogo_que_nao_chegou_no_cluster()
     test_verificacao_pega_job_que_ficou_na_branch()
     test_verificacao_pega_orquestrador_apontando_pra_job_id_velho()
