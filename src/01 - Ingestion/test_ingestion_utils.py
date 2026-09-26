@@ -244,6 +244,18 @@ def test_run_timestamp_e_constante_entre_chamadas():
     assert ingestion_utils._run_timestamp(None) is not None
 
 
+def test_secret_scope_vem_da_env_var():
+    # Stage nao importa base_utils (camadas separadas, cada uma com seu %run),
+    # entao o scope por ambiente tem que existir nos dois - se este aqui ficar
+    # pra tras, o Stage de prd le os secrets de dev.
+    assert ingestion_utils.secret_scope() == "mtg-pipeline"
+    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+    try:
+        assert ingestion_utils.secret_scope() == "mtg-pipeline-prd"
+    finally:
+        del os.environ["MTG_SECRET_SCOPE"]
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     test_http_get_with_retry_returns_response_on_success()
@@ -260,4 +272,5 @@ if __name__ == "__main__":
     test_run_stage_ingestion_none_df_propaga_erro_do_save()
     test_run_stage_ingestion_exception_marks_failed_and_reraises()
     test_run_timestamp_e_constante_entre_chamadas()
+    test_secret_scope_vem_da_env_var()
     print("OK")

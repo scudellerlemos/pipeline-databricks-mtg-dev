@@ -1,0 +1,24 @@
+name: Promover tag para produção
+
+# Este repo e o dono do CODIGO. Quem deploya producao e o repo de controle
+# (pipeline-databricks-mtg-prd), que nao tem copia de nada: ele faz checkout
+# DESTE repo na tag e roda o mesmo .github/scripts/deploy.py com as variaveis
+# de prod. Por isso aqui so avisa - nao copia arquivo nenhum.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  avisar-repo-de-producao:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy no repo de produção
+        env:
+          # PAT com permissao de escrita no repo de controle. E o unico secret
+          # que existe por causa da separacao em dois repos.
+          GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/scudellerlemos/pipeline-databricks-mtg-prd/dispatches --input - <<EOF
+          {"event_type": "deploy-prd", "client_payload": {"tag": "${GITHUB_REF_NAME}"}}
+          EOF
+          echo "Deploy de ${GITHUB_REF_NAME} solicitado ao repo de producao."

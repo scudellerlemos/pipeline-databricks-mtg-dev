@@ -47,6 +47,33 @@ def test_s3_bucket_has_no_silent_fallback():
         raise AssertionError("expected Exception for s3_bucket with no default")
 
 
+def test_scope_padrao_e_o_de_dev():
+    assert base_utils.secret_scope() == "mtg-pipeline"
+
+
+def test_scope_vem_da_env_var():
+    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+    try:
+        assert base_utils.secret_scope() == "mtg-pipeline-prd"
+    finally:
+        del os.environ["MTG_SECRET_SCOPE"]
+
+
+def test_catalog_name_nao_cai_pra_mtg_dev_fora_do_scope_de_dev():
+    # O desastre que isso trava: dev e prd dividem o mesmo workspace, entao um
+    # secret faltando no scope de prd fazia o job de producao gravar por cima
+    # das tabelas de mtg_dev - em silencio, sem task vermelha.
+    os.environ["MTG_SECRET_SCOPE"] = "mtg-pipeline-prd"
+    try:
+        base_utils.get_secret("catalog_name")
+    except Exception as e:
+        assert "catalog_name" in str(e)
+    else:
+        raise AssertionError("catalog_name nao pode cair pra mtg_dev fora de dev")
+    finally:
+        del os.environ["MTG_SECRET_SCOPE"]
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     test_explicit_default_wins()
@@ -54,4 +81,7 @@ if __name__ == "__main__":
     test_falls_back_to_layer_specific_default()
     test_raises_when_no_default_available()
     test_s3_bucket_has_no_silent_fallback()
+    test_scope_padrao_e_o_de_dev()
+    test_scope_vem_da_env_var()
+    test_catalog_name_nao_cai_pra_mtg_dev_fora_do_scope_de_dev()
     print("OK")
