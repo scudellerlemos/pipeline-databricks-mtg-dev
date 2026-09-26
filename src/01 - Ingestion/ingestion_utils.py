@@ -129,6 +129,20 @@ def as_float(valor):
     return float(valor) if valor is not None else None
 
 
+def _run_timestamp(run):
+    """Carimbo unico da execucao, como literal Python.
+
+    ponytail: NAO trocar por current_timestamp() - save_to_parquet chama .write
+    uma vez por particao (loop abaixo) e o Spark reavalia a expressao a cada
+    action, entao card_prices saia com 71 carimbos diferentes numa run so (1 por
+    mes de releaseDate). Um literal e avaliado uma vez e sobrevive a todas as
+    escritas. Mesmo padrao da Bronze com lit(run["run_id"]).
+    """
+    if run and run.get("started_at"):
+        return datetime.fromisoformat(run["started_at"])
+    return datetime.now(timezone.utc)
+
+
 def save_to_parquet(spark, data, table_name, base_path, schema=None,
                      partition_source_col=None, cutoff_date_str=None, run=None):
     """
@@ -145,7 +159,7 @@ def save_to_parquet(spark, data, table_name, base_path, schema=None,
     try:
         df = spark.createDataFrame(data, schema) if schema else spark.createDataFrame(data)
 
-        df = df.withColumn("ingestion_timestamp", current_timestamp()) \
+        df = df.withColumn("ingestion_timestamp", lit(_run_timestamp(run))) \
                .withColumn("source", lit("scryfall")) \
                .withColumn("endpoint", lit(table_name))
 

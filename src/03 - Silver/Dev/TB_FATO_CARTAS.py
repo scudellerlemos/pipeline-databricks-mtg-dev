@@ -37,7 +37,7 @@ quebrar o pipeline.
 PREÇO E MIGRAÇÃO NÃO ESTÃO AQUI: esta tabela tem grão só de "impressão de
 carta". Histórico de preço e id canônico pós-migração vivem em tabelas
 Silver próprias (TB_FATO_PRECOS_CARTAS, TB_MOV_MIGRACOES_CARTAS) - junte por
-NME_CARTA / ID_CARTA respectivamente.
+ID_CARTA nas duas (preço é por impressão, mesmo grão desta tabela).
 
 REGRA "SEM ( ) { } NO DADO SILVER": texto de carta/custo de mana/legalidades
 vem da Scryfall com notação de símbolo entre chaves (ex.: "{2}{U}{U}") e
