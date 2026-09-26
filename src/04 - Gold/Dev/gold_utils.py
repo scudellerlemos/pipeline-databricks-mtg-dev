@@ -293,26 +293,64 @@ def save_to_gold(df_final, catalog, schema, table_name, s3_gold_path,
 # Stage tem control table própria, _control/{table}/{run_id}.json, fora do
 # escopo deste módulo) - construído mínimo aqui, direto em Delta/SQL.
 # ============================================================================
-def run_data_quality_checks(spark_session, full_table_name, checks):
+class DataQualityError(RuntimeError):
+    """DQ estourou o limite. Carrega .resultados pra auditoria ainda ser gravada."""
+
+    def __init__(self, mensagem, resultados):
+        super().__init__(mensagem)
+        self.resultados = resultados
+
+
+def run_data_quality_checks(spark_session, rotulo, checks):
     """
     Roda uma lista de checagens de DQ (cada uma um SELECT que retorna 1 linha/
-    1 coluna com uma contagem) e loga o resultado. Nunca aborta a run: DQ aqui
-    é observabilidade (contagem logada), não tem substituto de dado - a única
-    checagem que aborta é a de PK/duplicata, feita à parte em
-    _declare_primary_key (essa sim levanta RuntimeError).
+    1 coluna com uma contagem), loga o resultado e ABORTA se alguma passar do
+    limite dela.
+
+    Cada valor do dict de checks diz qual e o limite:
+
+        "nome": query                 -> limite 0: qualquer ocorrencia aborta.
+        "nome": (query, 12000)        -> aborta acima de 12000 (tripwire).
+        "nome": (query, None)         -> so loga, contagem esperada e > 0.
+
+    O limite e obrigatorio de pensar porque DQ que so imprime e DQ que ninguem
+    le: a task fica verde e o numero so aparece pra quem for atras do log do
+    cluster, que nem sempre sobrevive.
+
+    Roda TODAS as checagens antes de abortar - saber que tres coisas quebraram
+    de uma vez e mais util do que descobrir uma por run.
 
     Args:
-        checks (dict): {nome_da_checagem: query SQL que retorna uma contagem}
+        rotulo (str): de onde vem a checagem, so pro log (nome da tabela,
+            "pré-join", etc).
+        checks (dict): {nome: query} ou {nome: (query, limite)}
 
     Returns:
         dict: {nome_da_checagem: contagem} - usado no resumo de auditoria.
+
+    Raises:
+        DataQualityError: se alguma contagem passou do limite.
     """
     resultados = {}
-    for nome, query in checks.items():
+    estourados = []
+    for nome, check in checks.items():
+        query, limite = check if isinstance(check, tuple) else (check, 0)
         contagem = spark_session.sql(query).collect()[0][0] or 0
         resultados[nome] = contagem
-        nivel = "⚠️" if contagem > 0 else "✅"
-        print(f"{nivel} DQ [{full_table_name}] {nome}: {contagem}")
+
+        if limite is None:
+            nivel = "ℹ️"
+        elif contagem > limite:
+            nivel = "❌"
+            estourados.append(f"{nome}={contagem} (limite {limite})")
+        else:
+            nivel = "✅"
+        print(f"{nivel} DQ [{rotulo}] {nome}: {contagem}")
+
+    if estourados:
+        raise DataQualityError(
+            f"DQ [{rotulo}] estourou o limite: " + "; ".join(estourados), resultados
+        )
     return resultados
 
 

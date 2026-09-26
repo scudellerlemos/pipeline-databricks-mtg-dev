@@ -119,33 +119,37 @@ def transform_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarec
     df_esclarecimentos.createOrReplaceTempView("_esclarecimentos")
     df_migracoes.createOrReplaceTempView("_migracoes")
 
-    # DATA QUALITY - join-caused exclusion: cartas sem NENHUMA cotação de
-    # preço são excluídas pelo INNER JOIN abaixo (grão exige DT_COTACAO não
-    # nula). Contagem logada aqui, antes do join, pra não depender da tabela
-    # final já gravada.
-    qtd_cartas_sem_cotacao = spark.sql("""
-        SELECT COUNT(DISTINCT c.ID_CARTA)
-        FROM _cartas c
-        LEFT JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
-        WHERE p.ID_CARTA IS NULL
-    """).collect()[0][0] or 0
-    nivel = "⚠️" if qtd_cartas_sem_cotacao > 0 else "✅"
-    print(f"{nivel} DQ [pré-join] cartas_excluidas_sem_cotacao_de_preco: {qtd_cartas_sem_cotacao}")
+    # DATA QUALITY (pré-join) - as duas exclusões que o INNER JOIN abaixo
+    # causa, contadas antes dele pra não dependerem da tabela final gravada.
+    # Aborta aqui é abortar barato: nada foi escrito ainda.
+    run_data_quality_checks(spark, "pré-join", {
+        # Carta sem NENHUMA cotação (o grão exige DT_COTACAO não nula). Sempre
+        # > 0: toda run traz carta nova antes do preço dela existir.
+        "cartas_excluidas_sem_cotacao_de_preco": ("""
+            SELECT COUNT(DISTINCT c.ID_CARTA)
+            FROM _cartas c
+            LEFT JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
+            WHERE p.ID_CARTA IS NULL
+        """, None),
 
-    # DATA QUALITY - lado espelho: preço de impressão que não está em
-    # TB_FATO_CARTAS. card_prices filtra por releaseDate e cards filtra por
-    # código de coleção (/sets), então token, promo e art series entram no preço
-    # e não na carta. São mantidos de propósito na Silver - cotação é o único
-    # dado não reproduzível do pipeline, carta volta inteira em toda run - mas o
-    # INNER JOIN abaixo os exclui, então a contagem fica logada em vez de sumir.
-    qtd_precos_sem_carta = spark.sql("""
-        SELECT COUNT(DISTINCT p.ID_CARTA)
-        FROM _precos p
-        LEFT JOIN _cartas c ON p.ID_CARTA = c.ID_CARTA
-        WHERE c.ID_CARTA IS NULL
-    """).collect()[0][0] or 0
-    nivel = "⚠️" if qtd_precos_sem_carta > 0 else "✅"
-    print(f"{nivel} DQ [pré-join] precos_excluidos_sem_carta: {qtd_precos_sem_carta}")
+        # Lado espelho: preço de impressão que não está em TB_FATO_CARTAS.
+        # card_prices filtra por releaseDate e cards filtra por código de
+        # coleção (/sets), então token, promo e art series entram no preço e
+        # não na carta. São mantidos de propósito na Silver - cotação é o único
+        # dado não reproduzível do pipeline.
+        #
+        # ponytail: 12000 é tripwire, não especificação. A baseline medida é
+        # 7476 (~12,5% dos preços); o limite existe pra pegar a mudança de
+        # regime - um filtro de coleção que quebrou faria isso saltar pra
+        # dezenas de milhares e a task continuaria verde. Quando estourar por
+        # motivo legítimo (coleção nova grande), mede de novo e sobe o número.
+        "precos_excluidos_sem_carta": ("""
+            SELECT COUNT(DISTINCT p.ID_CARTA)
+            FROM _precos p
+            LEFT JOIN _cartas c ON p.ID_CARTA = c.ID_CARTA
+            WHERE c.ID_CARTA IS NULL
+        """, 12000),
+    })
 
     spark.sql("""
         CREATE OR REPLACE TEMP VIEW _esclarecimentos_agg AS
@@ -268,28 +272,57 @@ except RuntimeError:
 # =============================================================================
 full_table_name = f"{config['catalog_name']}.{config['schema_gold']}.TB_FATO_MERCADO_CARTAS"
 
-dq_resultados = run_data_quality_checks(spark, full_table_name, {
-    "fk_null_id_oracle": f"SELECT COUNT(*) FROM {full_table_name} WHERE ID_ORACLE IS NULL",
-    "fk_colecao_nao_encontrada": f"SELECT COUNT(*) FROM {full_table_name} WHERE NME_COLECAO = 'Nao_Identificado'",
-    "valor_negativo_preco": f"""SELECT COUNT(*) FROM {full_table_name}
-        WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0
-           OR VLR_USD_FOIL < 0 OR VLR_USD_ETCHED < 0 OR VLR_EUR_FOIL < 0""",
-    "null_residual_categorico": f"""SELECT COUNT(*) FROM {full_table_name}
-        WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
-           OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL
-           OR NME_COLECAO IS NULL OR NME_BLOCO IS NULL""",
-    "cartas_com_id_migrado": f"SELECT COUNT(*) FROM {full_table_name} WHERE FLG_ID_CARTA_MIGRADO = 'Sim'",
-})
+dq_resultados = {}
+try:
+    dq_resultados = run_data_quality_checks(spark, full_table_name, {
+        # Chave do fato vinda direto da Silver, sem COALESCE. Linha de preço
+        # sem oracle_id é fato sem chave - não existe valor tolerável.
+        "fk_null_id_oracle": f"SELECT COUNT(*) FROM {full_table_name} WHERE ID_ORACLE IS NULL",
 
-record_gold_audit(
-    spark, config['catalog_name'], config['schema_gold'], "TB_FATO_MERCADO_CARTAS",
-    audit_run,
-    qtd_lidos=qtd_lidos,
-    qtd_processados=qtd_processados,
-    qtd_inseridos_atualizados=qtd_processados,
-    dq_resultados=dq_resultados,
-    status=audit_status
-)
+        # Todos esses passam por COALESCE ou pela regra de nulo da Silver, então
+        # NULL aqui é a regra tendo falhado, não dado faltando.
+        "null_residual_categorico": f"""SELECT COUNT(*) FROM {full_table_name}
+            WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
+               OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL
+               OR NME_COLECAO IS NULL OR NME_BLOCO IS NULL""",
+
+        # Preço negativo não existe no Scryfall: se apareceu, foi transformação.
+        "valor_negativo_preco": f"""SELECT COUNT(*) FROM {full_table_name}
+            WHERE VLR_USD < 0 OR VLR_EUR < 0 OR VLR_TIX < 0
+               OR VLR_USD_FOIL < 0 OR VLR_USD_ETCHED < 0 OR VLR_EUR_FOIL < 0""",
+
+        # Informativo: é o COALESCE de coleção entrando em ação (carta cuja
+        # COD_COLECAO não veio em /sets). Sem baseline medida ainda - vira
+        # limite quando a primeira run com esse código disser quanto é hoje.
+        "fk_colecao_nao_encontrada": (
+            f"SELECT COUNT(*) FROM {full_table_name} WHERE NME_COLECAO = 'Nao_Identificado'",
+            None,
+        ),
+
+        # Informativo por natureza: carta que a Scryfall renumerou. Cresce com
+        # o tempo e nunca volta a zero.
+        "cartas_com_id_migrado": (
+            f"SELECT COUNT(*) FROM {full_table_name} WHERE FLG_ID_CARTA_MIGRADO = 'Sim'",
+            None,
+        ),
+    })
+except DataQualityError as erro_dq:
+    audit_status = "FALHA_DQ"
+    dq_resultados = erro_dq.resultados
+    raise
+finally:
+    # finally e nao depois do try: sem isso a run que aborta no DQ nao deixa
+    # linha de auditoria nenhuma, e a unica prova do que aconteceu vira o log
+    # do cluster - que nao sobrevive ao fim do job.
+    record_gold_audit(
+        spark, config['catalog_name'], config['schema_gold'], "TB_FATO_MERCADO_CARTAS",
+        audit_run,
+        qtd_lidos=qtd_lidos,
+        qtd_processados=qtd_processados,
+        qtd_inseridos_atualizados=qtd_processados,
+        dq_resultados=dq_resultados,
+        status=audit_status
+    )
 
 # =============================================================================
 # VALIDACAO E LOGS
