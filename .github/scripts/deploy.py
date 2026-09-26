@@ -168,6 +168,56 @@ def get_existing_job_id(job_name, is_new_cli=False):
         return None
 
 
+def campos_criticos(settings):
+    """O pedaco das settings que, se nao chegou certo, o deploy mentiu.
+
+    Comparar as settings inteiras nao funciona: a API preenche default nosso
+    (format, timeout_seconds, email_notifications) e o diff vira ruido. Estes
+    sao os campos que o apply_target realmente decide - e cada um tem um modo
+    de falha silencioso conhecido:
+
+      git_ref            job de prd apontando pra branch em vez da tag
+      config_do_ambiente MTG_CATALOG_NAME que nao chegou = grava no mtg_dev
+      pause_status       schedule que voltou a ligar sozinho
+      run_job_task_ids   orquestrador chamando job_id velho (a substituicao
+                         de placeholder e feita na mao aqui, sem DAB)
+    """
+    git = settings.get("git_source") or {}
+    env_vars = {}
+    for cluster in settings.get("job_clusters", []):
+        env_vars.update((cluster.get("new_cluster") or {}).get("spark_env_vars", {}))
+    return {
+        "name": settings.get("name"),
+        "git_url": git.get("git_url"),
+        "git_ref": git.get("git_tag") or git.get("git_branch"),
+        "pause_status": (settings.get("schedule") or {}).get("pause_status"),
+        "config_do_ambiente": {k: v for k, v in env_vars.items() if k.startswith("MTG_")},
+        "run_job_task_ids": sorted(
+            str(t["run_job_task"].get("job_id"))
+            for t in settings.get("tasks", [])
+            if "run_job_task" in t
+        ),
+    }
+
+
+def diferencas(de, para):
+    """['campo: valor_antigo -> valor_novo'] entre dois campos_criticos()."""
+    return [f"{k}: {de[k]!r} -> {para[k]!r}" for k in para if de.get(k) != para[k]]
+
+
+def fetch_job(job_id, is_new_cli):
+    """Settings atuais do job, ou None se nao der pra ler."""
+    try:
+        cmd = ["databricks", "jobs", "get"]
+        cmd += [str(job_id)] if is_new_cli else ["--job-id", str(job_id)]
+        cmd += ["--output", "json" if is_new_cli else "JSON"]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return json.loads(result.stdout).get("settings")
+    except Exception as e:
+        log(f"⚠️ Não consegui ler o job {job_id}: {e}", "WARN")
+        return None
+
+
 def validate_databricks_connection():
     """Valida a conexão com o Databricks"""
     try:
@@ -224,6 +274,13 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
 
     if existing_id:
         log(f"🔄 Atualizando job existente: {job_config['name']} (ID {existing_id})")
+        # jobs reset sobrescreve as settings INTEIRAS: o que alguem mudou na UI
+        # morre aqui, calado. Nao da pra preservar (o YAML e a fonte da
+        # verdade), mas da pra dizer o que esta sendo desfeito.
+        atual = fetch_job(existing_id, is_new_cli)
+        if atual:
+            for drift in diferencas(campos_criticos(atual), campos_criticos(job_config)):
+                log(f"♻️ Sobrescrevendo {job_config['name']} · {drift}", "WARN")
         if is_new_cli:
             write_json({"job_id": existing_id, "new_settings": job_config})
             result = subprocess.run(
@@ -258,57 +315,64 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
         raise RuntimeError(f"Não foi possível determinar o job_id de {job_key} após o deploy")
 
     log(f"🎯 {job_key} -> job_id {job_id}")
-    return job_id
+    return job_id, job_config
 
 
 def deploy_all():
     connection_success, is_new_cli = validate_databricks_connection()
     if not connection_success:
-        return False
+        return False, is_new_cli, {}
 
     job_ids_by_key = {}
+    enviado_por_id = {}
     try:
         for yaml_path, job_key in DEPLOY_ORDER:
-            job_id = deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key)
+            job_id, job_config = deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key)
             job_ids_by_key[job_key] = job_id
-        return True
+            enviado_por_id[job_id] = job_config
+        return True, is_new_cli, enviado_por_id
     except subprocess.CalledProcessError as e:
         log(f"❌ Erro no deploy: {e}", "ERROR")
         log(f"📄 stdout: {e.stdout}", "DEBUG")
         log(f"📄 stderr: {e.stderr}", "ERROR")
-        return False
+        return False, is_new_cli, enviado_por_id
     except Exception as e:
         log(f"❌ Erro inesperado: {e}", "ERROR")
+        return False, is_new_cli, enviado_por_id
+
+
+def verify_deployment(enviado_por_id, is_new_cli):
+    """Le cada job de volta e confere que as settings que mandamos chegaram.
+
+    Conferir que o nome aparece em `jobs list` so prova que o job existe. O
+    que quebra silencioso e o job existir apontando pro lugar errado - tag que
+    nao foi aplicada, MTG_CATALOG_NAME que nao chegou no cluster, orquestrador
+    chamando um job_id que ja nao e o certo. Isso so aparece relendo.
+
+    Nao roda o pipeline: continua sendo verificacao de deploy, nao de dado.
+    Um run de verdade leva ~20min e bate no Scryfall - isso e a run agendada.
+    """
+    if not enviado_por_id:
+        log("❌ Nenhum job foi deployado", "ERROR")
         return False
 
+    log("🔍 Relendo os jobs deployados...")
+    all_ok = True
+    for job_id, enviado in enviado_por_id.items():
+        lido = fetch_job(job_id, is_new_cli)
+        if lido is None:
+            log(f"❌ {enviado['name']} (ID {job_id}) não pôde ser lido de volta", "ERROR")
+            all_ok = False
+            continue
 
-def verify_deployment():
-    """Verifica se todos os jobs foram deployados"""
-    try:
-        log("🔍 Verificando deploy...")
-        sleep_time = 30
-        log(f"⏳ Aguardando {sleep_time} segundos para verificação...")
-        import time
-        time.sleep(sleep_time)
-
-        result = subprocess.run(
-            ["databricks", "jobs", "list", "--output", "JSON"], capture_output=True, text=True, check=True,
-        )
-        jobs_data = json.loads(result.stdout)
-        jobs_list = jobs_data if isinstance(jobs_data, list) else jobs_data.get("jobs", [])
-        names_found = {job.get("settings", {}).get("name") for job in jobs_list}
-
-        all_ok = True
-        for _, job_key in DEPLOY_ORDER:
-            if job_name(job_key) in names_found:
-                log(f"✅ {job_name(job_key)} verificado")
-            else:
-                log(f"❌ {job_name(job_key)} não encontrado após deploy", "ERROR")
-                all_ok = False
-        return all_ok
-    except Exception as e:
-        log(f"❌ Erro na verificação: {e}", "ERROR")
-        return False
+        divergencias = diferencas(campos_criticos(lido), campos_criticos(enviado))
+        if divergencias:
+            all_ok = False
+            for d in divergencias:
+                log(f"❌ {enviado['name']} não bateu · {d}", "ERROR")
+        else:
+            log(f"✅ {enviado['name']} (ID {job_id}) confere")
+    return all_ok
 
 
 def cleanup():
@@ -326,11 +390,11 @@ if __name__ == "__main__":
     log("=" * 60)
 
     try:
-        deploy_success = deploy_all()
+        deploy_success, is_new_cli, enviado_por_id = deploy_all()
 
         if deploy_success:
             log("✅ Deploy executado com sucesso!")
-            verify_success = verify_deployment()
+            verify_success = verify_deployment(enviado_por_id, is_new_cli)
 
             if verify_success:
                 log("🎉 Deploy e verificação concluídos com sucesso!")
