@@ -17,6 +17,7 @@ mecanismo de captura de alteração) e sem regra de negócio - isso é Bronze/Si
 """
 
 import json
+import os
 import time
 import uuid
 from datetime import datetime, timezone
@@ -39,7 +40,22 @@ except NameError:
         pass
 
 
+def config_override(secret_name):
+    """Valor por ambiente, vindo de env var, ou None.
+
+    Stage nao importa base_utils (camadas separadas, cada uma com seu %run),
+    entao a precedencia env var > secret > default precisa existir aqui
+    tambem - senao o Stage de prd grava no prefixo de S3 do dev.
+    """
+    return os.environ.get("MTG_" + secret_name.upper()) or None
+
+
 def get_secret(secret_name, default_value=None):
+    override = config_override(secret_name)
+    if override:
+        print(f"Config '{secret_name}' veio do ambiente: {override}")
+        return override
+
     try:
         return dbutils.secrets.get(scope="mtg-pipeline", key=secret_name)
     except Exception:
