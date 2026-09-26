@@ -38,6 +38,16 @@ jobs:
           # que existe por causa da separacao em dois repos.
           GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
         run: |
+          # Descoberto na v1.0.0: o secret existia com valor VAZIO (um
+          # `gh secret set` sem stdin interativo). A mensagem do gh era
+          # "set the GH_TOKEN environment variable", que manda procurar o bug
+          # no workflow em vez de no secret.
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PRD_DISPATCH_TOKEN vazio ou ausente. A tag foi criada mas producao nao foi avisada."
+            echo "Corrija com: gh secret set PRD_DISPATCH_TOKEN --repo ${GITHUB_REPOSITORY} --body '<pat>'"
+            echo "Enquanto isso, deploye pelo workflow_dispatch do repo de controle."
+            exit 1
+          fi
           gh api repos/scudellerlemos/pipeline-databricks-mtg-prd/dispatches --input - <<EOF
           {"event_type": "deploy-prd", "client_payload": {"tag": "${GITHUB_REF_NAME}"}}
           EOF
