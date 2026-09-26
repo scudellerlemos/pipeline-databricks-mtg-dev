@@ -14,7 +14,11 @@ resources:
         # dia-da-semana 2 (segunda) ocorrencia #1 no mes)
         quartz_cron_expression: "0 0 6 ? * 2#1"
         timezone_id: America/Sao_Paulo
-        pause_status: UNPAUSED
+        # PAUSED e o default de proposito: quem carrega o schedule e producao,
+        # que sobe com MTG_PAUSE_STATUS=UNPAUSED. Dev e prd dividem o mesmo
+        # Scryfall - os dois agendados seria bater na API duas vezes pelo mesmo
+        # dado. Dev roda sob demanda, quando alguem esta mexendo.
+        pause_status: PAUSED
       tasks:
         - task_key: rodar_stage
           run_job_task:
