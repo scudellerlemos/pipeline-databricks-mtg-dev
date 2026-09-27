@@ -1,13 +1,8 @@
 name: Validade das credenciais
 
-# Os dois tokens que a esteira usa (o PAT do Databricks e o PAT que dispara o
-# repo de producao) expiram em silencio: no dia seguinte o deploy quebra com
-# erro de auth e ninguem sabe por que. Este workflow roda todo mes e FALHA
-# quando falta menos de 60 dias - falha de workflow agendado ja manda email
-# pro dono do repo, entao o aviso nao precisa de canal novo.
-#
-# Aviso, nao renovacao: rodar tokens sozinho exigiria um token com poder de
-# criar tokens, que e o problema que estamos tentando nao ter.
+# Confere a validade dos dois tokens da esteira (PAT do Databricks e PAT que
+# dispara o repo de producao). Roda todo mes e falha quando falta menos de 60
+# dias; o GitHub avisa o dono do repo por email. So avisa, nao renova.
 
 on:
   schedule:
@@ -27,8 +22,7 @@ jobs:
     steps:
       - uses: databricks/setup-cli@v1.16.1
 
-      # `tokens list` devolve TODOS os PATs do usuario chamador - inclusive o
-      # do repo de producao, que vive noutro repo. Um check cobre os dois.
+      # `tokens list` devolve todos os PATs do usuario, inclusive o usado no repo de producao.
       - name: PATs do Databricks
         env:
           DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
@@ -60,8 +54,7 @@ jobs:
           sys.exit(1 if problemas else 0)
           PY
 
-      # PAT do GitHub que o promote.yml usa pra publicar no repo de prd e
-      # disparar o deploy de la. Expirou = o promote falha e nada chega em prd.
+      # PAT do GitHub que o promote.yml usa pra publicar no repo de prd e disparar o deploy.
       - name: PAT de dispatch do GitHub
         env:
           TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
