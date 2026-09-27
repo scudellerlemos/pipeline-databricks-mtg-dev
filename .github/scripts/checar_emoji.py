@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 RAIZ_REPO = Path(__file__).resolve().parents[2]
-# Pictogramas, símbolos diversos/dingbats (✅ ❌ ⚠) e o seletor de variação.
+# Pictogramas, símbolos diversos/dingbats (check, X, alerta) e o seletor de variação.
 # Setas e símbolos de texto (→, ≥, ×) ficam de fora: são usados na doc.
-REGEX_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️]")
+REGEX_EMOJI = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\uFE0F]")
 
 
 def achar_emojis(texto):
