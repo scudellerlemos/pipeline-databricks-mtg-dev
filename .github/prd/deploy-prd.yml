@@ -1,13 +1,13 @@
 name: Deploy produção (MTG)
 
-# ATENCAO: este arquivo NAO roda neste repo. Ele e o conteudo do unico arquivo
-# do repo de controle de producao (pipeline-databricks-mtg-prd), onde vive como
-# .github/workflows/deploy-prd.yml. A copia fica versionada aqui porque o
-# desenho dos jobs de prod tem que passar pela mesma revisao que o codigo.
+# ATENCAO: este arquivo NAO roda no repo de dev. A cada merge na main o
+# promote.yml de la copia o snapshot do codigo pro repo de producao (pipeline-databricks-mtg-prd) e poe
+# este arquivo em .github/workflows/deploy-prd.yml. Ele fica versionado no dev
+# porque o desenho dos jobs de prod passa pela mesma revisao que o codigo.
 #
-# O repo de controle nao guarda copia de src/ nem dos DAGs: ele faz checkout
-# DESTE repo na tag promovida e roda o mesmo deploy.py. Assim nao existe
-# segunda copia do pipeline pra divergir da primeira.
+# Os jobs de prod leem o codigo DO REPO DE PRODUCAO, nunca do de dev: la o dev
+# tem liberdade de apagar tag, dar force-push, ate apagar o repo, e nada disso
+# pode derrubar producao. O que roda aqui so muda por uma promocao.
 
 on:
   repository_dispatch:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag do repo de código a deployar (ex.: v1.0.0)"
+        description: "Tag deste repo a deployar (ex.: prd-20261001-0930-ccae429)"
         required: true
 
 # Dois deploys de prod simultaneos deixariam metade dos jobs numa tag e
@@ -27,14 +27,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CODE_REPO: scudellerlemos/pipeline-databricks-mtg-dev
+  # Este proprio repo: o codigo chega aqui pela promocao, nao e lido do dev.
+  CODE_REPO: ${{ github.repository }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Environment separado do de dev: outros secrets, e e onde mora o portao
-    # de aprovacao manual (required reviewer). O dispatch da tag chega aqui e
-    # PARA ate alguem aprovar - nada toca o mtg_prod antes disso.
+    # Environment separado do de dev: outros secrets. Sem required reviewer:
+    # o merge na main ja e a decisao de publicar.
     environment: Databricks-Prod
 
     steps:
@@ -52,8 +52,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Vem do codigo na tag, nao daqui: este arquivo so muda quando o repo
-      # -prd e atualizado na mao, e foi assim que o requests ficou pra tras.
+      # Dependencias vem do codigo publicado, num arquivo so com o CI de dev.
       - name: Instalar dependências
         run: pip install -r .github/requirements-ci.txt
 
@@ -61,8 +60,8 @@ jobs:
       - name: Instalar Databricks CLI
         uses: databricks/setup-cli@v1.16.1
 
-      # A tag ja passou no CI do repo de codigo, mas producao revalida: a tag
-      # pode ter sido criada num commit que nunca virou PR.
+      # Ja passou no CI de dev, mas producao revalida o que de fato chegou
+      # aqui - inclusive num rollback pra uma tag antiga.
       - name: Revalidar o código promovido
         run: |
           python .github/scripts/validate_dag.py

@@ -1,41 +1,46 @@
 name: Promover tag para produção
 
-# Este repo e o dono do CODIGO. Quem deploya producao e o repo de controle
-# (pipeline-databricks-mtg-prd), que nao tem copia de nada: ele faz checkout
-# DESTE repo na tag e roda o mesmo .github/scripts/deploy.py com as variaveis
-# de prod. Por isso aqui so avisa - nao copia arquivo nenhum.
+# Merge na main = producao. Quando o CI da main termina verde (validacao +
+# deploy de dev), publica o snapshot desse commit no repo de producao
+# (pipeline-databricks-mtg-prd): copia o codigo, commita, cria uma tag
+# prd-<data>-<sha> (e ela que o rollback redeploya) e dispara o deploy. Os
+# jobs de prod leem de la, entao nada que aconteca neste repo depois - tag,
+# force-push, branch apagada - chega em producao sem passar por aqui.
+# O PAT precisa de "Contents" e "Workflows" com escrita no -prd.
+
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: ["CI/CD Pipeline - Magic Card Game"]
+    types: [completed]
+    branches: [main]
+
+# Dois merges seguidos: publica um de cada vez, na ordem.
+concurrency:
+  group: promote-prd
+  cancel-in-progress: false
 
 jobs:
-  avisar-repo-de-producao:
+  publicar-em-producao:
+    # So push na main que passou em tudo. Run de PR tambem dispara
+    # workflow_run, e CI vermelho nunca vira producao.
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      # `git tag v9 && git push --tags` funciona em QUALQUER commit, inclusive
-      # um que nunca virou PR e nunca passou pelo required check da main. Sem
-      # esta checagem a tag e um desvio completo do portao de revisao.
-      - name: Checkout com historico
+      # O commit que o CI validou, nao o que estiver na ponta da main agora.
+      - name: Checkout do commit validado
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
 
-      - name: Exigir que a tag esteja na main
-        run: |
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::A tag $GITHUB_REF_NAME aponta pra um commit que nao esta na main."
-            echo "Producao so roda codigo que passou pelo PR. Apague a tag, faca merge e tagueie de novo."
-            exit 1
-          fi
-          echo "✅ $GITHUB_REF_NAME esta na main"
+      - name: Nomear a publicação
+        run: echo "TAG=prd-$(date -u +%Y%m%d-%H%M)-${SHA::7}" >> "$GITHUB_ENV"
 
-      - name: Disparar deploy no repo de produção
+      - name: Conferir o token do repo de produção
         env:
-          # PAT com permissao de escrita no repo de controle. E o unico secret
-          # que existe por causa da separacao em dois repos.
           GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
         run: |
           # Descoberto na v1.0.0: o secret existia com valor VAZIO (um
@@ -43,13 +48,41 @@ jobs:
           # "set the GH_TOKEN environment variable", que manda procurar o bug
           # no workflow em vez de no secret.
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::PRD_DISPATCH_TOKEN vazio ou ausente. A tag foi criada mas producao nao foi avisada."
+            echo "::error::PRD_DISPATCH_TOKEN vazio ou ausente. Merge feito mas producao nao foi publicada."
             echo "Corrija com: gh secret set PRD_DISPATCH_TOKEN --repo ${GITHUB_REPOSITORY} --body '<pat>'"
-            echo "Enquanto isso, deploye pelo workflow_dispatch do repo de controle."
             exit 1
           fi
+
+      - name: Checkout do repo de produção
+        uses: actions/checkout@v4
+        with:
+          repository: scudellerlemos/pipeline-databricks-mtg-prd
+          token: ${{ secrets.PRD_DISPATCH_TOKEN }}
+          path: .prd
+
+      # Snapshot inteiro, com --delete: arquivo apagado aqui some la tambem.
+      # .github/workflows fica de fora - os workflows DESTE repo (CI, deploy
+      # de dev, esta promocao) nao podem rodar em producao. La so existe o
+      # deploy-prd.yml, que vem da copia revisada em .github/prd/.
+      - name: Publicar o snapshot no repo de produção
+        run: |
+          rsync -a --delete --exclude .git --exclude .prd --exclude .github/workflows ./ .prd/
+          mkdir -p .prd/.github/workflows
+          cp .github/prd/deploy-prd.yml .prd/.github/workflows/deploy-prd.yml
+          cd .prd
+          git config user.name "github-actions[bot]"
+          git config user.email "41898+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publica $TAG (dev $SHA)" || echo "Nada mudou desde a ultima publicacao."
+          git tag "$TAG"
+          git push -q origin HEAD:main "refs/tags/$TAG"
+          echo "✅ $TAG publicada em pipeline-databricks-mtg-prd"
+
+      - name: Disparar deploy no repo de produção
+        env:
+          GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
+        run: |
           gh api repos/scudellerlemos/pipeline-databricks-mtg-prd/dispatches --input - <<EOF
-          {"event_type": "deploy-prd", "client_payload": {"tag": "${GITHUB_REF_NAME}"}}
+          {"event_type": "deploy-prd", "client_payload": {"tag": "${TAG}"}}
           EOF
-          echo "Deploy de ${GITHUB_REF_NAME} solicitado ao repo de producao."
-          echo "O workflow de la PARA no portao de aprovacao do environment Databricks-Prod."
+          echo "Deploy de ${TAG} solicitado ao repo de producao."
