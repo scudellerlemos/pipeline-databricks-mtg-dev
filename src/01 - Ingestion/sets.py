@@ -1,7 +1,7 @@
 # Databricks notebook source
 # Ingestão de Sets - Magic: The Gathering (Scryfall)
 # Objetivo: Ingerir dados de sets via Scryfall API para staging em Parquet no S3
-# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, incremental, tratamento de campos complexos
+# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, snapshot, tratamento de campos complexos
 
 # =============================================================================
 # BIBLIOTECAS UTILIZADAS

@@ -1,7 +1,7 @@
 # Databricks notebook source
 # Ingestão de Rulings - Magic: The Gathering (Scryfall)
 # Objetivo: Ingerir rulings (decisões oficiais de regras) via Scryfall Bulk Data API para staging em Parquet no S3
-# Características: Dados brutos, formato Parquet, sem filtro temporal, incremental, idempotente
+# Características: Dados brutos, formato Parquet, sem filtro temporal, snapshot, idempotente
 
 # =============================================================================
 # BIBLIOTECAS UTILIZADAS

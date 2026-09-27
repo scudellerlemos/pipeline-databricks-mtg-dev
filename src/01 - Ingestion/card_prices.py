@@ -1,7 +1,7 @@
 # Databricks notebook source
 # Ingestão de Preços de Cards - Magic: The Gathering
 # Objetivo: Ingerir preços das cartas via Scryfall Bulk Data API para staging em Parquet no S3
-# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, incremental, idempotente
+# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, snapshot, idempotente
 
 # =============================================================================
 # BIBLIOTECAS UTILIZADAS
