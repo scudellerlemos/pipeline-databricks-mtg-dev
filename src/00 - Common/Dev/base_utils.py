@@ -148,8 +148,11 @@ def obter_segredo(nome_segredo, valor_padrao=None, padroes_seguros_extras=None):
 # ============================================================================
 # CONTRATO DE SCHEMA
 # ============================================================================
-class ErroContratoEsquema(RuntimeError):
-    """Lote quebra o contrato de schema da tabela - nada foi gravado."""
+class ErroContratoEsquema(Exception):
+    """Lote quebra o contrato de schema da tabela - nada foi gravado.
+
+    Não é RuntimeError: a Gold trata RuntimeError do salvar como FALHA_DQ_PK.
+    """
 
 
 def campos_do_esquema(esquema):
