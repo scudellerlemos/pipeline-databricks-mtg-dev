@@ -13,6 +13,9 @@ on:
       - '.github/DAGs/**'
       - '.github/workflows/**'
       - '.github/scripts/**'
+      # Nao tocam o dev, mas a promocao pra prd pega carona neste run.
+      - '.github/prd/**'
+      - '.github/requirements-ci.txt'
 
 # Dois merges seguidos na main = dois `jobs reset` correndo nos mesmos 5 jobs.
 # cancel-in-progress: false porque cancelar um deploy no meio deixa parte dos
