@@ -18,6 +18,10 @@ on:
       tag:
         description: "Tag deste repo a deployar (ex.: prd-20261001-0930-ccae429)"
         required: true
+      rodar:
+        description: "Rodar o MTG_PIPELINE_PRD depois do deploy"
+        type: boolean
+        default: false
 
 # Dois deploys de prod simultaneos deixariam metade dos jobs numa tag e
 # metade noutra. Nao cancela o que ja esta rodando: um deploy pela metade e
@@ -110,6 +114,21 @@ jobs:
           MTG_CATALOG_NAME: "mtg_prod"
           MTG_S3_BUCKET: "s3://magicthegatheringdev/prd"
         run: python .github/scripts/smoke.py
+
+      # Codigo novo em prd reprocessa na hora, em vez de esperar a carga
+      # mensal. Silver faz MERGE com dedup, entao rodar a mais nao duplica.
+      # --no-wait: a carga leva mais que o deploy; falha avisa pelo e-mail
+      # de alerta do job, nao por aqui.
+      - name: Rodar o pipeline em produção
+        if: github.event.client_payload.rodar == true || inputs.rodar == true
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+        run: |
+          JOB=$(databricks jobs list --name MTG_PIPELINE_PRD -o json | jq -r '.[0].job_id')
+          RUN=$(databricks jobs run-now "$JOB" --no-wait -o json | jq -r .run_id)
+          echo "MTG_PIPELINE_PRD disparado: run $RUN"
+          echo "- Pipeline disparado: run \`$RUN\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Resumo
         run: |
