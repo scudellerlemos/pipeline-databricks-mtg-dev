@@ -67,14 +67,16 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add -A
-          # Sem arquivo mudado (ex.: force-push so de mensagens) nao ha commit: publica
-          # e deploya a tag, mas nao reprocessa.
-          if git commit -q -m "Publica $TAG (dev $SHA)"; then
+          # Reprocessa so se mudou algo alem de documentacao (*.md e docs/).
+          # Sem mudanca ou so doc: publica e deploya a tag, mas nao roda o pipeline.
+          # quotepath=off: sem isso o git poe entre aspas caminho com acento e o $ do regex nao casa.
+          if git -c core.quotepath=off diff --cached --name-only | grep -qvE '\.md$|^docs/'; then
             echo "RODAR=true" >> "$GITHUB_ENV"
           else
-            echo "Nada mudou desde a ultima publicacao."
+            echo "Sem mudanca de codigo: publica sem rodar o pipeline."
             echo "RODAR=false" >> "$GITHUB_ENV"
           fi
+          git commit -q -m "Publica $TAG (dev $SHA)" || echo "Nada mudou desde a ultima publicacao."
           git tag "$TAG"
           git push -q origin HEAD:main "refs/tags/$TAG"
           echo "$TAG publicada em pipeline-databricks-mtg-prd"
