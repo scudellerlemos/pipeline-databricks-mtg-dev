@@ -28,10 +28,6 @@ TABELAS SILVER USADAS:
   a Scryfall fundiu/removeu o ID_CARTA e qual é o id vigente. Uma carta pode
   ter vários eventos; vence o mais recente (DT_EXECUCAO, ID_MIGRACAO).
 
-TABELAS SILVER NÃO USADAS:
-- TB_DOM_SIMBOLOS e TB_PONTE_CARTA_SIMBOLOS: grão carta x símbolo de mana,
-  juntar aqui mudaria o grão desta tabela.
-
 REGRA DE NULO:
 - NME_COLECAO/NME_BLOCO nulos (sem coleção ou sem bloco) -> 'Nao_Identificado'.
 - Demais categóricos vêm da Silver como estão.

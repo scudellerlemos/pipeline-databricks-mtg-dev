@@ -235,3 +235,20 @@ de documentação só redeploya. Rollback manual roda só com o input `rodar` ma
 mais é seguro pela [ADR-003](#adr-003--bronze-append-only-silver-e-gold-com-merge).
 Falha da carga avisa pelo e-mail de alerta do job, não pelo GitHub — o workflow
 termina antes da carga.
+
+## ADR-012 — Símbolos de mana fora do pipeline
+
+**Contexto.** `symbology` (Stage/Bronze), `TB_DOM_SIMBOLOS` e
+`TB_PONTE_CARTA_SIMBOLOS` (Silver) não tinham consumidor: a Gold não usa (grão
+carta x símbolo não cabe em carta x cotação) e, em 90 dias, a linhagem do Unity
+Catalog só mostrou leitura pelos próprios jobs Silver — nenhum SELECT de SQL,
+Genie ou dashboard. Cor e custo de mana por carta já chegam na Gold por
+`COD_CORES`, `NME_CATEGORIA_COR` e `QTD_CUSTO_MANA`.
+
+**Decisão.** Sai do pipeline: endpoint `/symbology`, Bronze `symbology`, Silver
+`TB_DOM_SIMBOLOS` e `TB_PONTE_CARTA_SIMBOLOS` (notebooks, DAGs, column_docs,
+testes e docs). As tabelas e os arquivos no S3 são apagados à mão, fora do deploy.
+
+**Consequências.** Menos 4 tasks e 3 tabelas pra manter. Análise por símbolo de
+mana volta com revert deste commit quando tiver consumidor — de preferência já
+agregada por carta, sem mudar o grão da Gold.

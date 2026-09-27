@@ -28,25 +28,9 @@ resources:
             source: GIT
           job_cluster_key: Job_cluster
 
-        - task_key: silver_simbolos
-          notebook_task:
-            notebook_path: src/03 - Silver/Dev/TB_DOM_SIMBOLOS
-            source: GIT
-          job_cluster_key: Job_cluster
-
         - task_key: silver_esclarecimentos
           notebook_task:
             notebook_path: src/03 - Silver/Dev/TB_FATO_ESCLARECIMENTOS_CARTAS
-            source: GIT
-          job_cluster_key: Job_cluster
-
-        # Ponte carta x simbolo de mana: le TB_FATO_CARTAS e TB_DOM_SIMBOLOS (Silver).
-        - task_key: silver_ponte_simbolos
-          depends_on:
-            - task_key: silver_cartas
-            - task_key: silver_simbolos
-          notebook_task:
-            notebook_path: src/03 - Silver/Dev/TB_PONTE_CARTA_SIMBOLOS
             source: GIT
           job_cluster_key: Job_cluster
 

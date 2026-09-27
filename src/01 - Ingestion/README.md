@@ -17,7 +17,7 @@ com controle de execução auditável.
 
 ## Fonte de dados: Scryfall API
 
-Os seis notebooks usam exclusivamente a
+Os cinco notebooks usam exclusivamente a
 [Scryfall API](https://scryfall.com/docs/api):
 
 - **`cards.py`** e **`card_prices.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
@@ -26,11 +26,6 @@ Os seis notebooks usam exclusivamente a
 - **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
   sem paginação. Captura também `card_count`, `parent_set_code`, `block` e
   `icon_svg_uri` (campos nativos da Scryfall).
-- **`symbology.py`**: `GET /symbology` — catálogo inteiro de símbolos de carta/mana
-  em 1 request (`has_more: false`), sem paginação. Tabela de referência estática (84
-  símbolos): sem filtro temporal, idempotência só por arquivo do dia. Consumida
-  na Silver por `TB_DOM_SIMBOLOS` (e, indiretamente, por
-  `TB_PONTE_CARTA_SIMBOLOS`, que usa `TB_DOM_SIMBOLOS` como domínio).
 - **`rulings.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data) (`rulings`)
   — mesmo padrão de `cards.py`/`card_prices.py` (1 request pro índice + 1
   download do `.jsonl.gz` inteiro). Sem filtro temporal: diferente de preço/impressão,
@@ -60,14 +55,13 @@ e decide o que gravar via idempotência de arquivo (abaixo), não via delta da A
 | `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `codigos_colecoes` dentro da janela `years_back` (via `sets`) |
 | `sets.py` | `GET /sets` | 1 linha por coleção | Filtra por `releaseDate >= cutoff` |
 | `card_prices.py` | `bulk-data/default_cards` | 1 linha por impressão (`id`) | Filtra por `releaseDate >= cutoff`, independente de `cards.py` |
-| `symbology.py` | `GET /symbology` | 1 linha por símbolo | Catálogo estático, sem filtro temporal |
 | `rulings.py` | `bulk-data/rulings` | 1 linha por ruling (referenciada por `oracle_id`) | Sem filtro temporal, catálogo inteiro (~79k linhas) |
 | `migrations.py` | `GET /migrations` | 1 linha por migração de ID | Único endpoint paginado da Stage, sem filtro temporal |
 
 Os notebooks são independentes entre si — nenhum lê o S3 gravado por outro. No
-job `MTG_STAGE` (`.github/DAGs/stage.yml`) as 6 tasks rodam em paralelo, sem
+job `MTG_STAGE` (`.github/DAGs/stage.yml`) as 5 tasks rodam em paralelo, sem
 `depends_on` entre elas. O cluster do job tem autoscale (1→2 workers) para
-aguentar o pico das 6 tasks em paralelo (com 1 worker fixo, as 6 juntas dão OOM).
+aguentar o pico das tasks em paralelo (com 1 worker fixo, as 6 que existiam davam OOM).
 
 `card_prices.py` não depende de `cards.py`: grava seu próprio snapshot de
 `default_cards` (1 linha por impressão, com `id`) filtrado pela mesma janela
@@ -95,7 +89,6 @@ de duplicado aqui:
 - **Por tabela:** [`cards`](<../02 - Bronze/Documentação/cards/README.md>),
   [`sets`](<../02 - Bronze/Documentação/sets/README.md>),
   [`card_prices`](<../02 - Bronze/Documentação/card_prices/README.md>),
-  [`symbology`](<../02 - Bronze/Documentação/symbology/README.md>),
   [`rulings`](<../02 - Bronze/Documentação/rulings/README.md>),
   [`migrations`](<../02 - Bronze/Documentação/migrations/README.md>).
 - **Fonte única (Python):** [`../02 - Bronze/Dev/bronze_column_docs.py`](<../02 - Bronze/Dev/bronze_column_docs.py>).
@@ -128,8 +121,6 @@ s3://{bucket}/{stage_prefix}/
 │   └── {year}_{month}_{YYYYMMDD}_sets.parquet          # ano/mês do releaseDate + data da execução: 1 arquivo por mês de lançamento
 ├── card_prices/
 │   └── {year}_{month}_{YYYYMMDD}_card_prices.parquet   # idem sets (releaseDate da impressão)
-├── symbology/
-│   └── {year}_{month}_{YYYYMMDD}_symbology.parquet     # partição por data de ingestão (sem coluna de data própria)
 ├── rulings/
 │   └── {year}_{month}_{YYYYMMDD}_rulings.parquet       # partição por data de ingestão (published_at não é usado)
 ├── migrations/
@@ -138,7 +129,6 @@ s3://{bucket}/{stage_prefix}/
     ├── cards/{run_id}.json
     ├── sets/{run_id}.json
     ├── card_prices/{run_id}.json
-    ├── symbology/{run_id}.json
     ├── rulings/{run_id}.json
     └── migrations/{run_id}.json
 ```
@@ -146,7 +136,7 @@ s3://{bucket}/{stage_prefix}/
 ## Idempotência e controle de execução
 
 - **Nome de arquivo determinístico** — se o arquivo já existe, a run
-  pula essa partição (`files_skipped`) em vez de sobrescrever. Os seis notebooks
+  pula essa partição (`files_skipped`) em vez de sobrescrever. Os cinco notebooks
   usam o mesmo esquema via `salvar_em_parquet()` (`nome_arquivo_parquet()`).
   `{YYYYMMDD}` é a data completa da execução; `{year}_{month}` é a partição -
   a data da execução, exceto em `sets` e `card_prices`, onde vem do
@@ -164,7 +154,7 @@ s3://{bucket}/{stage_prefix}/
 
 ## Erros e retry
 
-`obter_http_com_retentativa()` cobre todo request HTTP dos seis notebooks: retry com backoff
+`obter_http_com_retentativa()` cobre todo request HTTP dos cinco notebooks: retry com backoff
 em 429 e 5xx, timeout/erro de conexão também tenta de novo; 4xx (exceto 429) falha
 direto, sem retry (erro do cliente não muda tentando de novo).
 

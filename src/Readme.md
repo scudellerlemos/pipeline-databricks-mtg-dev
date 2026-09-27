@@ -52,7 +52,7 @@ Transformar dados brutos da API da Scryfall em uma tabela de mercado de cartas p
 **Processo**: **EL (Extract & Load)**
 - **Extract**: Leitura de dados Parquet da staging (S3)
 - **Load**: Append-only no Unity Catalog (sem MERGE/upsert), idempotente por `source_file`
-- **Dados**: 6 tabelas, uma por origem da Stage (`cards`, `sets`, `card_prices`, `symbology`, `rulings`, `migrations`)
+- **Dados**: 5 tabelas, uma por origem da Stage (`cards`, `sets`, `card_prices`, `rulings`, `migrations`)
 
 **Características**:
 - Dados brutos preservados 1:1 (schema de origem, sem renomeação)
@@ -61,7 +61,7 @@ Transformar dados brutos da API da Scryfall em uma tabela de mercado de cartas p
 - Governança via Unity Catalog (tabela e coluna comentadas - ver [`Documentação/`](<02 - Bronze/Documentação/README.md>))
 - Histórico completo via Delta Lake
 
-**Tabelas**: `cards`, `sets`, `card_prices`, `symbology`, `rulings`, `migrations` -
+**Tabelas**: `cards`, `sets`, `card_prices`, `rulings`, `migrations` -
 sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 
 ### Camada Silver - Dados Limpos
@@ -70,7 +70,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 **Processo**: **TL (Transform & Load)**
 - **Transform**: Limpeza, padronização e enriquecimento via SQL (`spark.sql()` sobre temp views)
 - **Load**: Carregamento incremental com dados refinados
-- **Dados**: 7 tabelas enriquecidas e padronizadas
+- **Dados**: 5 tabelas enriquecidas e padronizadas
 
 **Características**:
 - Dados limpos e padronizados
@@ -85,8 +85,6 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - **TB_FATO_PRECOS_CARTAS** - Preços processados
 - **TB_FATO_ESCLARECIMENTOS_CARTAS** - Esclarecimentos oficiais de regras
 - **TB_MOV_MIGRACOES_CARTAS** - Reconciliação de IDs de carta
-- **TB_DOM_SIMBOLOS** - Catálogo de símbolos de mana/custo
-- **TB_PONTE_CARTA_SIMBOLOS** - Ponte carta x símbolo (custo de mana explodido)
 
 ### Camada Gold - Consumo
 **Localização**: `src/04 - Gold/`
@@ -173,7 +171,7 @@ salvar_na_gold(df_gold, catalogo, "gold", "TB_FATO_MERCADO_CARTAS", caminho_s3_g
 ## Métricas e KPIs do Pipeline
 
 ### Performance
-- **Ingestão**: bulk-data em 1 download por tabela (cards/card_prices de `default_cards`, rulings de `rulings`); /sets e /symbology em 1 request; /migrations paginado
+- **Ingestão**: bulk-data em 1 download por tabela (cards/card_prices de `default_cards`, rulings de `rulings`); /sets em 1 request; /migrations paginado
 - **Processamento**: Incremental por chaves específicas
 
 ### Qualidade

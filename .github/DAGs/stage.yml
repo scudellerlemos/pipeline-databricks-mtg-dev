@@ -29,12 +29,6 @@ resources:
             source: GIT
           job_cluster_key: Job_cluster
 
-        - task_key: stage_simbologia
-          notebook_task:
-            notebook_path: src/01 - Ingestion/symbology
-            source: GIT
-          job_cluster_key: Job_cluster
-
         - task_key: stage_migracoes
           notebook_task:
             notebook_path: src/01 - Ingestion/migrations

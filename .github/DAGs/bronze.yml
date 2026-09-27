@@ -24,12 +24,6 @@ resources:
             source: GIT
           job_cluster_key: Job_cluster
 
-        - task_key: bronze_simbologia
-          notebook_task:
-            notebook_path: src/02 - Bronze/Dev/symbology
-            source: GIT
-          job_cluster_key: Job_cluster
-
         - task_key: bronze_regras
           notebook_task:
             notebook_path: src/02 - Bronze/Dev/rulings

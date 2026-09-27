@@ -9,18 +9,16 @@ Uma única tabela: `TB_FATO_MERCADO_CARTAS` - visão de mercado de cartas de Mag
 
 ## Modelagem (Silver -> Gold)
 
-`TB_FATO_MERCADO_CARTAS` usa 5 das 7 tabelas Silver. `TB_DOM_SIMBOLOS` e `TB_PONTE_CARTA_SIMBOLOS` existem na Silver (análise por símbolo/cor de mana) mas têm grão incompatível com a Gold (`TB_DOM_SIMBOLOS`: 1 linha por símbolo; `TB_PONTE_CARTA_SIMBOLOS`: carta x símbolo - nenhum é carta x cotação) - não entram na junção.
+`TB_FATO_MERCADO_CARTAS` usa as 5 tabelas Silver.
 
 ```mermaid
 graph TD
-    subgraph SILVER["Camada Silver (7 tabelas)"]
+    subgraph SILVER["Camada Silver (5 tabelas)"]
         FATO_CARTAS["TB_FATO_CARTAS<br/>PK: ID_CARTA"]
         DIM_COLECOES["TB_DIM_COLECOES<br/>PK: COD_COLECAO"]
         FATO_PRECOS["TB_FATO_PRECOS_CARTAS<br/>PK: ID_CARTA + DT_INGESTAO"]
         FATO_ESCLARECIMENTOS["TB_FATO_ESCLARECIMENTOS_CARTAS<br/>PK: ID_ESCLARECIMENTO"]
         MOV_MIGRACOES["TB_MOV_MIGRACOES_CARTAS<br/>PK: ID_MIGRACAO"]
-        DOM_SIMBOLOS["TB_DOM_SIMBOLOS<br/>PK: COD_SIMBOLO"]
-        PONTE_SIMBOLOS["TB_PONTE_CARTA_SIMBOLOS<br/>PK: ID_CARTA + NUM_ORDEM_SIMBOLO<br/>Liga FATO_CARTAS a DOM_SIMBOLOS"]
     end
 
     subgraph GOLD["Camada Gold"]
@@ -33,16 +31,11 @@ graph TD
     FATO_ESCLARECIMENTOS -->|"ID_ORACLE, qtd esclarecimentos"| GOLD_MERCADO
     MOV_MIGRACOES -->|"ID_CARTA_ANTIGO, resolve ID_CARTA_CANONICO"| GOLD_MERCADO
 
-    FATO_CARTAS -.->|"DESC_CUSTO_MANA explodido"| PONTE_SIMBOLOS
-    DOM_SIMBOLOS -.->|"COD_SIMBOLO, FK"| PONTE_SIMBOLOS
-
     classDef used fill:#2f6f4f,stroke:#1b4332,color:#ffffff,stroke-width:2px;
     classDef gold fill:#b8860b,stroke:#7a5c00,color:#ffffff,stroke-width:2px;
-    classDef unused fill:#555555,stroke:#999999,color:#ffffff,stroke-dasharray:4 4;
 
     class FATO_CARTAS,DIM_COLECOES,FATO_PRECOS,FATO_ESCLARECIMENTOS,MOV_MIGRACOES used;
     class GOLD_MERCADO gold;
-    class DOM_SIMBOLOS,PONTE_SIMBOLOS unused;
 ```
 
-Verde = alimenta a Gold. Cinza tracejado = existe na Silver mas não entra na junção (grão incompatível).
+Verde = alimenta a Gold.

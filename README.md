@@ -15,7 +15,7 @@
 
 ## Visão Geral
 
-Pipeline de dados para análise de mercado de cartas Magic: The Gathering: coleta da API pública da Scryfall (endpoints bulk-data, /sets, /symbology e /migrations) e processamento em camadas no Databricks.
+Pipeline de dados para análise de mercado de cartas Magic: The Gathering: coleta da API pública da Scryfall (endpoints bulk-data, /sets e /migrations) e processamento em camadas no Databricks.
 
 ### Objetivos
 
@@ -55,7 +55,6 @@ pipeline-databricks-mtg-dev/
 │   │   ├── cards.py               # Cartas
 │   │   ├── sets.py                # Sets/Expansões
 │   │   ├── card_prices.py         # Preços das cartas
-│   │   ├── symbology.py           # Símbolos de mana/custo
 │   │   ├── rulings.py             # Esclarecimentos de regras
 │   │   ├── migrations.py          # Reconciliação de IDs Scryfall
 │   │   └── ingestion_utils.py     # HTTP retry, S3, controle de execução
@@ -65,7 +64,6 @@ pipeline-databricks-mtg-dev/
 │   │   │   ├── cards.py
 │   │   │   ├── sets.py
 │   │   │   ├── card_prices.py
-│   │   │   ├── symbology.py
 │   │   │   ├── rulings.py
 │   │   │   ├── migrations.py
 │   │   │   └── bronze_utils.py    # EL compartilhado (append + Unity Catalog)
@@ -78,8 +76,6 @@ pipeline-databricks-mtg-dev/
 │   │   │   ├── TB_FATO_PRECOS_CARTAS.py
 │   │   │   ├── TB_FATO_ESCLARECIMENTOS_CARTAS.py
 │   │   │   ├── TB_MOV_MIGRACOES_CARTAS.py
-│   │   │   ├── TB_DOM_SIMBOLOS.py
-│   │   │   ├── TB_PONTE_CARTA_SIMBOLOS.py
 │   │   │   └── silver_utils.py    # TL compartilhado (transform + Unity Catalog)
 │   │   └── Documentação/
 │   │
@@ -127,7 +123,7 @@ pipeline-databricks-mtg-dev/
 
 ### 2. Bronze Layer
 - **Função**: EL puro (Extract & Load) - lê o Parquet da Stage e grava Delta append-only, sem regra de negócio
-- **Dados**: 6 tabelas (`cards`, `sets`, `card_prices`, `symbology`, `rulings`, `migrations`), uma por origem da Stage
+- **Dados**: 5 tabelas (`cards`, `sets`, `card_prices`, `rulings`, `migrations`), uma por origem da Stage
 - **Particionamento**: Nenhum (volume atual não justifica)
 - **Preservação**: Schema de origem 1:1, sem dedup nem MERGE/upsert
 - **Documentação de negócio**: [`src/02 - Bronze/Documentação/`](<src/02 - Bronze/Documentação/README.md>) (tabela e coluna, comentado também no Unity Catalog)
@@ -141,7 +137,7 @@ pipeline-databricks-mtg-dev/
 
 ### 4. Gold Layer
 - **Função**: Visão de mercado pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver
-- **Dados**: 1 tabela (`TB_FATO_MERCADO_CARTAS`) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; 5 das 7 tabelas Silver alimentam a junção (`TB_DOM_SIMBOLOS`/`TB_PONTE_CARTA_SIMBOLOS` têm grão incompatível e ficam de fora)
+- **Dados**: 1 tabela (`TB_FATO_MERCADO_CARTAS`) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; usa as 5 tabelas Silver
 - **Grão**: 1 linha por cotação de preço de uma impressão de carta — chave `(ID_CARTA, DT_COTACAO)`
 - **Carga**: Full extract da Silver a cada execução + merge Delta idempotente pela chave, particionada por ano/mês de cotação
 - **Qualidade**: Checagens de PK/FK, valor negativo de preço e nulo residual, auditadas por run em `TB_AUDITORIA_GOLD`
@@ -205,7 +201,6 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 - **Cartas**: catálogo completo via bulk-data
 - **Sets**: Todas as expansões
 - **Preços**: Histórico de preços (uma linha por coleta, sem dedup)
-- **Symbology**: Catálogo de símbolos de mana/custo
 - **Rulings**: Esclarecimentos oficiais de regras por carta
 - **Migrations**: Histórico de reconciliação de IDs de carta
 

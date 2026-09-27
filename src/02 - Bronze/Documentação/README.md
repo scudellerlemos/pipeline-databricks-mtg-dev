@@ -23,11 +23,10 @@ Unity Catalog (`{catalog}.bronze.cards`, etc.), o prefixo seria redundante.
 | `cards` | `cards` | [`cards.py`](../Dev/cards.py) | [`src/01 - Ingestion/cards.py`](<../../01 - Ingestion/cards.py>) | [`cards/README.md`](./cards/README.md) |
 | `sets` | `sets` | [`sets.py`](../Dev/sets.py) | [`src/01 - Ingestion/sets.py`](<../../01 - Ingestion/sets.py>) | [`sets/README.md`](./sets/README.md) |
 | `card_prices` | `card_prices` | [`card_prices.py`](../Dev/card_prices.py) | [`src/01 - Ingestion/card_prices.py`](<../../01 - Ingestion/card_prices.py>) | [`card_prices/README.md`](./card_prices/README.md) |
-| `symbology` | `symbology` | [`symbology.py`](../Dev/symbology.py) | [`src/01 - Ingestion/symbology.py`](<../../01 - Ingestion/symbology.py>) | [`symbology/README.md`](./symbology/README.md) |
 | `rulings` | `rulings` | [`rulings.py`](../Dev/rulings.py) | [`src/01 - Ingestion/rulings.py`](<../../01 - Ingestion/rulings.py>) | [`rulings/README.md`](./rulings/README.md) |
 | `migrations` | `migrations` | [`migrations.py`](../Dev/migrations.py) | [`src/01 - Ingestion/migrations.py`](<../../01 - Ingestion/migrations.py>) | [`migrations/README.md`](./migrations/README.md) |
 
-Todas as 6 tabelas têm um `README.md` próprio com a descrição de negócio da
+Todas as 5 tabelas têm um `README.md` próprio com a descrição de negócio da
 tabela (o que é, pra que serve) e a lista completa de colunas específicas
 dela. Os mesmos textos (copiados à mão) comentam a tabela/coluna no
 Unity Catalog (`DESCRIBE TABLE EXTENDED {tabela}` mostra o mesmo conteúdo) -
