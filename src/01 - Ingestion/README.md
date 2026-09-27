@@ -17,17 +17,15 @@ com controle de execução auditável.
 
 ## Fonte de dados: Scryfall API
 
-A [magicthegathering.io](https://docs.magicthegathering.io) foi descontinuada como
-fonte (issues #121/#123/#127/#128/#129) — os seis notebooks usam exclusivamente a
+Os seis notebooks usam exclusivamente a
 [Scryfall API](https://scryfall.com/docs/api):
 
 - **`cards.py`** e **`card_prices.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
   (`default_cards`, ambos) — 1 request pro índice + 1 download do `.jsonl.gz`
   inteiro, filtrado em memória. Sem paginação, sem 1 request por carta/coleção.
 - **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
-  sem paginação. Além dos campos herdados da magicthegathering.io, captura também
-  `card_count`, `parent_set_code`, `block` e `icon_svg_uri` — nativos da Scryfall,
-  sem equivalente na fonte antiga, antes simplesmente não coletados.
+  sem paginação. Captura também `card_count`, `parent_set_code`, `block` e
+  `icon_svg_uri` (campos nativos da Scryfall).
 - **`symbology.py`**: `GET /symbology` — catálogo inteiro de símbolos de carta/mana
   em 1 request (`has_more: false`), sem paginação. Tabela de referência estática (84
   símbolos): sem filtro temporal, idempotência só por arquivo do dia. Consumida
@@ -68,17 +66,12 @@ e decide o que gravar via idempotência de arquivo (abaixo), não via delta da A
 
 Os notebooks são independentes entre si — nenhum lê o S3 gravado por outro. No
 job `MTG_STAGE` (`.github/DAGs/stage.yml`) as 6 tasks rodam em paralelo, sem
-`depends_on` entre elas. Antes eram limitadas a 3 simultâneas via `depends_on`
-em pares, só por throttling de concorrência (o cluster de 1 worker fixo já
-deu OOM rodando as 6 juntas) — trocado por autoscale (1→2 workers) no cluster
-do job, que dá folga pro pico das 6 tasks em paralelo sem exigir dependência
-manual no yml nem manter o custo de 2 workers o tempo todo.
+`depends_on` entre elas. O cluster do job tem autoscale (1→2 workers) para
+aguentar o pico das 6 tasks em paralelo (com 1 worker fixo, as 6 juntas dão OOM).
 
-`card_prices.py` já leu os arquivos de `cards.parquet` pra descobrir quais cartas
-precisava precificar (criando uma dependência de execução entre os dois); hoje ele
-grava seu próprio snapshot de `default_cards` (1 linha por impressão, com `id`)
-filtrado pela mesma janela `years_back`, e o join com `cards` é 1:1 por `id` e
-fica pra Gold.
+`card_prices.py` não depende de `cards.py`: grava seu próprio snapshot de
+`default_cards` (1 linha por impressão, com `id`) filtrado pela mesma janela
+`years_back`, e o join com `cards` é 1:1 por `id` e fica pra Gold.
 
 `ingestion_utils.py` concentra o que é comum aos notebooks (`%run ./ingestion_utils`):
 `get_secret`, `setup_s3_storage`, `http_get_with_retry`, `save_to_parquet`,
@@ -93,7 +86,7 @@ devolvido).
 A Stage grava o dado como recebido da Scryfall, só mapeado 1:1 para os nomes
 de coluna esperados por Bronze/Silver (ex.: `type_line`→`type`,
 `released_at`→`releaseDate`), com campos compostos serializados em JSON e sem
-regra de negócio (ver [Imutabilidade](#-imutabilidade) abaixo) - é o
+regra de negócio (ver [Imutabilidade](#imutabilidade) abaixo) - é o
 mesmo schema que a Bronze lê e persiste no Unity Catalog. Por isso o
 significado de negócio de cada tabela e cada coluna (o que é, pra que serve,
 que informação você tira dela) é documentado uma única vez, na Bronze, em vez
@@ -150,8 +143,6 @@ s3://{bucket}/{stage_prefix}/
     └── migrations/{run_id}.json
 ```
 
-Cada tabela tem sua própria pasta - antes os 6 arquivos viviam juntos num diretório flat, distinguidos só pelo sufixo do nome.
-
 ## Idempotência e controle de execução
 
 - **Nome de arquivo determinístico** — se o arquivo já existe, a run
@@ -160,9 +151,8 @@ Cada tabela tem sua própria pasta - antes os 6 arquivos viviam juntos num diret
   `{YYYYMMDD}` é a data completa da execução; `{year}_{month}` é a partição -
   a data da execução, exceto em `sets` e `card_prices`, onde vem do
   `releaseDate`. Com a data completa no nome, runs em meses diferentes nunca
-  colidem (antes só o dia do mês entrava no nome e, em `sets`/`card_prices`,
-  a run de 05/10 achava o arquivo de 05/09 e pulava a coleta). Arquivos
-  antigos, no formato só-dia, continuam válidos: a Bronze controla por caminho.
+  colidem. Arquivos antigos, só com o dia no nome, continuam válidos: a Bronze
+  controla por caminho.
 - **`start_run()`/`finish_run()`** (`ingestion_utils.py`): o `start_run` monta o registro em memória e o `finish_run` grava um JSON por execução em
   `_control/{table}/{run_id}.json` com: `run_id`, `endpoint`, `params`, início/fim,
   duração, `files_written`/`files_skipped`/`records_written`, `status`

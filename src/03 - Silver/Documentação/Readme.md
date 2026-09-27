@@ -9,17 +9,17 @@
 
 ## Visão Geral
 
-Esta pasta contém a **documentação completa** de todas as tabelas da camada Silver do pipeline de dados do Magic: The Gathering. Cada tabela possui sua documentação detalhada com schema, regras de negócio, chave única, particionamento e linhagem de dados.
+Esta pasta contém a documentação de todas as tabelas da camada Silver do pipeline de dados do Magic: The Gathering. Cada tabela possui sua documentação detalhada com schema, regras de negócio, chave única, particionamento e linhagem de dados.
 
 ## Objetivo
 
-Fornecer documentação executiva e técnica de todas as tabelas Silver, permitindo:
+Fornecer documentação de negócio e técnica de todas as tabelas Silver, permitindo:
 - **Visão geral rápida** das tabelas disponíveis
 - **Acesso direto** à documentação detalhada de cada tabela
 - **Entendimento da arquitetura** de dados da camada Silver
 - **Referência técnica** para desenvolvimento, análise e manutenção
 
-## 🃏 Tabelas Documentadas
+## Tabelas Documentadas
 
 ### [TB_FATO_CARTAS](TB_FATO_CARTAS/Readme.md) - Cartas do Magic
 - **Descrição**: Dados limpos de cartas (uma linha por impressão) - o que é a carta: regras, custo, tipo, raridade, coleção
@@ -74,9 +74,6 @@ Fornecer documentação executiva e técnica de todas as tabelas Silver, permiti
 | TB_DOM_SIMBOLOS | DOM/REF | COD_SIMBOLO | nenhum |
 | TB_FATO_ESCLARECIMENTOS_CARTAS | Fato sem medida | ID_ESCLARECIMENTO | ANO_PUBLICACAO/MES_PUBLICACAO |
 | TB_PONTE_CARTA_SIMBOLOS | Ponte/associativa | ID_CARTA + NUM_ORDEM_SIMBOLO | nenhum |
-
-## Flavor Text da Documentação
-*"Como um bibliotecário arcano organizando grimórios lapidados, a documentação da camada Silver revela o valor oculto de cada tabela, guiando magos e engenheiros de dados na busca por insights refinados."*
 
 ## Estatísticas da Camada Silver
 

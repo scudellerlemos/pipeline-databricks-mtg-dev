@@ -12,13 +12,13 @@
 
 ## Visão Geral
 
-Esta pasta contém os notebooks responsáveis pela **camada Silver** do pipeline de dados do Magic: The Gathering. A camada Silver realiza o processo **TL (Transform & Load)**, refinando, limpando e enriquecendo os dados da Bronze para análises avançadas e modelagem de negócio.
+Esta pasta contém os notebooks responsáveis pela **camada Silver** do pipeline de dados do Magic: The Gathering. A camada Silver realiza o processo **TL (Transform & Load)**, limpando, padronizando e enriquecendo os dados da Bronze.
 
 ## Objetivo
 
 Transformar dados estruturados da Bronze em dados limpos, padronizados e enriquecidos na Silver (Unity Catalog/Delta), garantindo:
 - **Transform**: Limpeza, padronização e enriquecimento
-- **Load**: Carregamento incremental com merge inteligente
+- **Load**: Carregamento incremental com merge por chave
 - **Governança**: Controle e rastreabilidade via Unity Catalog
 - **Performance**: Otimização com Delta Lake
 - **Prontidão Analítica**: Dados prontos para análises e camadas superiores
@@ -120,9 +120,6 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 - Verificação de integridade
 - Logs de processamento
 
-### Flavor Text do Processamento
-*"Como um alquimista, a camada Silver transmuta dados brutos em informação valiosa, pronta para ser utilizada nas estratégias mais complexas do multiverso analítico."*
-
 ## Controle de Qualidade
 
 ### Validações Implementadas
@@ -149,7 +146,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 - **Merge**: Incremental por `ID_CARTA` / `COD_COLECAO`
 - **Particionamento**: `ANO_INGESTAO`/`MES_INGESTAO` (cartas) e `ANO_LANCAMENTO`/`MES_LANCAMENTO` (coleções)
 - **Histórico**: Mantido no Delta Lake
-- **Tipo**: 🃏 Creature/Spell/Artifact (dinâmicos)
+- **Tipo**: Creature/Spell/Artifact (dinâmicos)
 
 ### Dados de Preços (`TB_FATO_PRECOS_CARTAS`)
 - **Grão**: uma cotação por impressão (`ID_CARTA`) por coleta (`DT_INGESTAO`)
@@ -160,12 +157,9 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 - **Fonte**: Scryfall (todas as tabelas da Silver vêm da Scryfall)
 - **Tipo**: Market Data (dados dinâmicos)
 
-### Flavor Text dos Dados
-*"Na Silver, cada dado é polido como uma joia, revelando seu verdadeiro valor para as estratégias do plano."*
+## Funcionalidades
 
-## Funcionalidades Avançadas
-
-### Merge Incremental Inteligente
+### Merge Incremental
 ```python
 delta_table.alias("silver").merge(df_final.alias("novo"), "silver.ID_CARTA <=> novo.ID_CARTA") \
     .withSchemaEvolution().whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
@@ -192,12 +186,9 @@ delta_table.alias("silver").merge(df_final.alias("novo"), "silver.ID_CARTA <=> n
 
 Após o processamento na Silver, os dados estarão disponíveis para:
 1. **Camada Gold**: Modelos de dados finais e métricas
-2. **Análises**: Consultas e dashboards avançados
+2. **Análises**: Consultas e dashboards
 
 ## Engenharia de Dados
-
-### Flavor Text da Engenharia
-*"Como um ourives lapidando gemas raras, a engenharia da Silver transforma dados em insights valiosos, prontos para brilhar nas análises mais exigentes."*
 
 ### Princípios da Camada Silver
 
@@ -208,7 +199,7 @@ Após o processamento na Silver, os dados estarão disponíveis para:
 - Metadados organizados
 
 #### 2. Incrementalidade
-- Merge inteligente de dados
+- Merge por chave
 - Preservação de histórico
 - Performance otimizada
 - Recuperação de falhas

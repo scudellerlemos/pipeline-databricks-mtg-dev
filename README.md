@@ -1,4 +1,4 @@
-# 🃏 Pipeline de Dados - Magic: The Gathering
+# Pipeline de Dados - Magic: The Gathering
 
 <div align="center">
 
@@ -15,14 +15,12 @@
 
 ## Visão Geral
 
-Este projeto implementa um **pipeline completo de dados** para análise de mercado de cartas Magic: The Gathering, utilizando a API pública da Scryfall (endpoints bulk-data, /sets, /symbology e /migrations) e processando dados através de um pipeline ETL moderno no Databricks.
+Pipeline de dados para análise de mercado de cartas Magic: The Gathering: coleta da API pública da Scryfall (endpoints bulk-data, /sets, /symbology e /migrations) e processamento em camadas no Databricks.
 
 ### Objetivos
 
 - **Análise de Mercado**: Monitoramento de preços e tendências
-- **Métricas de Investimento**: Performance e ROI de cartas
-- **Insights Estratégicos**: Dados para decisões de negócio
-- **Automação Completa**: Pipeline CI/CD com deploy automático
+- **Automação**: Pipeline CI/CD com deploy automático
 
 ## Arquitetura
 
@@ -178,14 +176,11 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 - **Trigger**: CI da `main` verde após um push — **merge na `main` = produção**, sem tag nem aprovação manual. Merge só de documentação (README, `docs/`) não dispara: vai junto na próxima publicação de código
 - **Snapshot**: o repo inteiro é copiado para o repo de prd, commitado e marcado com a tag `prd-AAAAMMDD-HHMM-<sha7>`
 - **Deploy**: o `deploy-prd.yml` do repo de prd revalida, cria os jobs `MTG_*_PRD` apontando para a tag e roda o smoke test
-- ▶️ **Carga**: se o snapshot publicado mudou algum arquivo (código ou não), dispara o `MTG_PIPELINE_PRD` na hora
-- ⏪ **Rollback**: `Actions → Deploy produção (MTG) → Run workflow` no repo de prd, com a tag anterior (marque `rodar` para reprocessar)
+- **Carga**: se o snapshot publicado mudou algum arquivo (código ou não), dispara o `MTG_PIPELINE_PRD` na hora
+- **Rollback**: `Actions → Deploy produção (MTG) → Run workflow` no repo de prd, com a tag anterior (marque `rodar` para reprocessar)
 - **Token**: `PRD_DISPATCH_TOKEN` (PAT com *Contents* e *Workflows* no repo de prd); o `check-credenciais.yml` avisa 60 dias antes de expirar
 
 ## Tecnologias
-
-*Stack Tecnológico*
-
 
 | Componente | Tecnologia | Versão |
 |------------|------------|---------|
@@ -207,7 +202,7 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 
 
 ### Entidades Principais
-- 🃏 **Cartas**: catálogo completo via bulk-data
+- **Cartas**: catálogo completo via bulk-data
 - **Sets**: Todas as expansões
 - **Preços**: Histórico de preços (uma linha por coleta, sem dedup)
 - **Symbology**: Catálogo de símbolos de mana/custo
@@ -235,7 +230,7 @@ export DATABRICKS_TOKEN="your-token"
 
 ### 2. Deploy Automático
 Merge na `main` que mexe em código, com o CI verde, deploya em dev e publica em produção — ver
-[CI/CD Pipeline](#-cicd-pipeline). Nenhum passo manual.
+[CI/CD Pipeline](#cicd-pipeline). Nenhum passo manual.
 
 ### 3. Monitoramento
 - **Databricks Jobs**: Monitoramento de execução
@@ -281,7 +276,7 @@ vêm do instance pool `mtg-pipeline-pool-dbr154`, não do YAML:
 > pool novo e atualizar o `instance_pool_id` nos quatro YAMLs.
 
 ### Schedule
-- ⏰ **Frequência**: Mensal, 1ª segunda-feira do mês, às 6h (Brasil) — `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`
+- **Frequência**: Mensal, 1ª segunda-feira do mês, às 6h (Brasil) — `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`
 - **Timezone**: America/Sao_Paulo
 - **Status**: `PAUSED` em dev, `UNPAUSED` em prd
 
@@ -326,11 +321,11 @@ prd sobrescreve via env var `MTG_*` injetada pelo `deploy.py` ([ADR-005](docs/AD
 
 <div align="center">
 
-**Pipeline Magic: The Gathering - Transformando dados em insights estratégicos! **
+**Pipeline Magic: The Gathering**
 
 
 <img src="https://media1.tenor.com/m/yf2J9gTT3rQAAAAC/bye-bye.gif" alt="Bye Bye" width="200" height="150">
 
-*Obrigado por explorar nosso pipeline! *
+*Obrigado por explorar o pipeline!*
 
 </div> 

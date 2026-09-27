@@ -10,26 +10,26 @@
 
 ## Visão Geral do Data Lake
 
-Este repositório contém o **pipeline completo de dados** do Magic: The Gathering, implementado como um Data Lake moderno no Databricks. O pipeline segue a arquitetura **Medallion** com três camadas principais: **Bronze** (dados brutos), **Silver** (dados limpos) e **Gold** (análises executivas).
+Este repositório contém o pipeline de dados do Magic: The Gathering no Databricks. O pipeline segue a arquitetura **Medallion**, com uma Stage de ingestão e três camadas: **Bronze** (dados brutos), **Silver** (dados limpos) e **Gold** (tabela de consumo).
 
 ### Objetivo Principal
 
-Transformar dados brutos da API do Magic: The Gathering em insights estratégicos e análises executivas, seguindo as melhores práticas de Data Engineering:
+Transformar dados brutos da API da Scryfall em uma tabela de mercado de cartas pronta para análise:
 
 - **Extract & Load** (Bronze) - Carregamento de dados brutos
 - **Transform & Load** (Silver) - Limpeza e enriquecimento
-- **Analyze & Load** (Gold) - Análises executivas e métricas
+- **Analyze & Load** (Gold) - Junção para consumo
 
 ## Arquitetura do Data Lake
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    MAGIC: THE GATHERING                  │
+│                    MAGIC: THE GATHERING                     │
 │                            DATA LAKE                        │
 └─────────────────────────────────────────────────────────────┘
 
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   BRONZE     │    │   SILVER    │    │   GOLD       │
+│   BRONZE        │    │   SILVER        │    │   GOLD          │
 │                 │    │                 │    │                 │
 │ • Extract       │───▶│ • Transform     │───▶│ • Analyze       │
 │ • Load          │    │ • Load          │    │ • Load          │
@@ -39,8 +39,8 @@ Transformar dados brutos da API do Magic: The Gathering em insights estratégico
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 
 ┌─────────────────────────────────────────────────────────────┐
-│                    UNITY CATALOG                         │
-│{catalog}.{bronze|silver|gold}  (dev: mtg_dev · prd: mtg_prod)│
+│                    UNITY CATALOG                            │
+│{catalog}.{bronze|silver|gold} (dev: mtg_dev · prd: mtg_prod)│
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -81,7 +81,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - Regras de negócio em SQL, com duas exceções em Python: a normalização de texto (`normalizar_valores`, UDF) e a resolução da cadeia de migrações de ID (`attach_canonical_id` em TB_MOV_MIGRACOES_CARTAS, no driver)
 
 **Tabelas**:
-- 🃏 **TB_FATO_CARTAS** - Cartas enriquecidas
+- **TB_FATO_CARTAS** - Cartas enriquecidas
 - **TB_DIM_COLECOES** - Expansões com metadados
 - **TB_FATO_PRECOS_CARTAS** - Preços processados
 - **TB_FATO_ESCLARECIMENTOS_CARTAS** - Esclarecimentos oficiais de regras
@@ -89,7 +89,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - **TB_DOM_SIMBOLOS** - Catálogo de símbolos de mana/custo
 - **TB_PONTE_CARTA_SIMBOLOS** - Ponte carta x símbolo (custo de mana explodido)
 
-### Camada Gold - Análises Executivas
+### Camada Gold - Consumo
 **Localização**: `src/04 - Gold/`
 
 **Processo**: **AL (Analyze & Load)**
@@ -188,17 +188,7 @@ save_to_gold(df_gold, catalog_name, "gold", "TB_FATO_MERCADO_CARTAS", s3_gold_pa
 ### Análises de Mercado
 - Valorização de cartas por set e raridade
 - Análise de tendências temporais
-- Identificação de oportunidades de investimento
-
-### Análises de Jogo
-- Performance de cartas por formato
-- Análise de metagame e tendências
-- Estatísticas de uso e popularidade
-
-### Análises Executivas
-- KPIs de performance de investimentos
-- Alertas de oportunidades e riscos
-- Relatórios estratégicos para tomada de decisão
+- Carta por volume de esclarecimentos de regras
 
 ## Configuração e Execução
 
@@ -228,7 +218,7 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 1. **Ingestão**: `src/01 - Ingestion/` (extração da API)
 2. **Bronze**: `src/02 - Bronze/` (carregamento de dados brutos)
 3. **Silver**: `src/03 - Silver/` (transformação e limpeza)
-4. **Gold**: `src/04 - Gold/` (análises executivas)
+4. **Gold**: `src/04 - Gold/` (tabela de mercado)
 
 
 ## Próximos Passos
@@ -247,10 +237,6 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 - Cache inteligente para consultas frequentes
 - Otimização de queries com Z-Order
 - Monitoramento avançado de performance
-
-## Flavor Text do Data Lake
-
-*"Como um multiverso de dados que se expande infinitamente, este Data Lake transforma a magia bruta da informação em insights estratégicos de poder inestimável. Cada camada é um plano de existência, cada tabela uma criatura mágica, cada análise um feitiço de poder executivo."*
 
 ---
 

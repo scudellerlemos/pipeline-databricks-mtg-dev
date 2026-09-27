@@ -3,9 +3,8 @@ name: CI/CD Pipeline - Magic Card Game
 on:
   pull_request:
     branches: [ main ]
-    # SEM filtro de paths de proposito: "validate" e required status check na
-    # main. Um PR que so mexe em README nao dispararia o workflow, o check
-    # nunca reportaria e o PR ficaria bloqueado pra sempre, sem mensagem.
+    # Sem filtro de paths: "validate" e required status check na main e precisa
+    # reportar em todo PR, senao o PR fica bloqueado.
   push:
     branches: [ main ]
     paths:
@@ -13,14 +12,12 @@ on:
       - '.github/DAGs/**'
       - '.github/workflows/**'
       - '.github/scripts/**'
-      # Dependencias do CI (e do deploy de prd, que instala o mesmo arquivo).
       - '.github/requirements-ci.txt'
-      # Nao toca o dev, mas a promocao pra prd pega carona neste run.
+      # Nao afeta dev, mas a promocao pra prd depende deste run.
       - '.github/prd/**'
 
-# Dois merges seguidos na main = dois `jobs reset` correndo nos mesmos 5 jobs.
-# cancel-in-progress: false porque cancelar um deploy no meio deixa parte dos
-# jobs na versao nova e parte na velha - pior que esperar.
+# Um deploy por vez, sem cancelar o que esta rodando: deploy interrompido
+# deixa parte dos jobs na versao nova e parte na velha.
 concurrency:
   group: deploy-dev
   cancel-in-progress: false
@@ -31,9 +28,7 @@ jobs:
   # ============================================================================
   validate:
     runs-on: ubuntu-latest
-    # Sem `environment:` de proposito: este job nao le secret nenhum. Amarrar
-    # ele no environment Databricks faria todo PR esperar aprovacao manual no
-    # dia em que esse environment ganhar required reviewer.
+    # Sem `environment:`: nao le secrets, e assim nao herda aprovacao manual do environment.
     permissions:
       contents: read
       pull-requests: write
@@ -91,8 +86,7 @@ jobs:
           });
 
   # ============================================================================
-  # DEPLOY EM DEV - todo push de codigo na main. Nao ha aprovacao exigida
-  # aqui nem em producao: projeto solo, o merge ja e a decisao (ADR-007).
+  # DEPLOY EM DEV - todo push de codigo na main, sem aprovacao (ADR-007).
   # ============================================================================
   deploy:
     needs: validate
@@ -106,8 +100,7 @@ jobs:
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
-      # Destino do alerta de falha injetado em todo job pelo deploy.py.
-      # Vazio = os jobs sobem sem on_failure e o deploy grita no log.
+      # Email do alerta on_failure de todos os jobs. Vazio = sem alerta (o deploy avisa no log).
       MTG_ALERT_EMAIL: ${{ vars.MTG_ALERT_EMAIL }}
 
     steps:
@@ -122,22 +115,16 @@ jobs:
     - name: Instalar dependências
       run: pip install -r .github/requirements-ci.txt
 
-    # CLI nova (binario Go), nao o pacote pip `databricks-cli`, que esta
-    # deprecado e so le DATABRICKS_TOKEN. A tag pinada e a MESMA versao que
-    # roda na maquina de quem desenvolve - CI e local divergirem de CLI e
-    # exatamente como o deploy.py acabou tendo dois caminhos de comando.
+    # CLI nova (binario Go), nao o pacote pip `databricks-cli` (deprecado).
+    # Versao pinada igual a usada localmente.
     - name: Instalar Databricks CLI
       uses: databricks/setup-cli@v1.16.1
 
-    # Sem "teste de conexao": `databricks jobs list || echo ok` passava sempre,
-    # inclusive com token morto. A primeira chamada do deploy.py falha com a
-    # mensagem de verdade da API, que e mais util.
+    # A conexao e validada pelo proprio deploy.py, que falha com o erro da API.
     - name: Deploy dos jobs em dev
       run: python .github/scripts/deploy.py
 
-    # O deploy prova que o job esta configurado certo. Isto prova que o
-    # ambiente sobe, que as env vars chegaram no cluster e que o Unity Catalog
-    # deixa gravar - as tres coisas que nenhuma validacao estatica alcanca.
+    # Sobe um cluster e confere env vars e escrita no Unity Catalog (ver smoke.py).
     - name: Smoke test no ambiente deployado
       run: python .github/scripts/smoke.py
 
