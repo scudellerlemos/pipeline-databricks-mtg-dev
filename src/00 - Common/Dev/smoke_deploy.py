@@ -57,7 +57,7 @@ try:
     lido = spark.sql(f"SELECT n FROM {tabela}").collect()[0][0]
     if lido != 1:
         raise AssertionError(f"escreveu 1, leu {lido}")
-    print(f"✅ escrita/leitura em {catalog} ok")
+    print(f"escrita/leitura em {catalog} ok")
 finally:
     spark.sql(f"DROP TABLE IF EXISTS {tabela}")
 

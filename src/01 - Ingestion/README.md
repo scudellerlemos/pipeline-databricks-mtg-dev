@@ -1,4 +1,4 @@
-# 📥 Stage - Magic: The Gathering
+# Stage - Magic: The Gathering
 
 <div align="center">
 
@@ -8,14 +8,14 @@
 
 </div>
 
-## 📋 Visão Geral
+## Visão Geral
 
 Camada **Stage**: coleta dados brutos da Scryfall e persiste em Parquet no S3, sem
 nenhuma regra de negócio (isso é Bronze/Silver). Responsabilidade única: garantir que
 o dado foi obtido corretamente, gravado de forma íntegra, idempotente e reprocessável,
 com controle de execução auditável.
 
-## 🔗 Fonte de dados: Scryfall API
+## Fonte de dados: Scryfall API
 
 A [magicthegathering.io](https://docs.magicthegathering.io) foi descontinuada como
 fonte (issues #121/#123/#127/#128/#129) — os seis notebooks usam exclusivamente a
@@ -55,7 +55,7 @@ A Scryfall não expõe CDC nem um cursor de "o que mudou desde X" para cards/set
 além do filtro temporal por `years_back`: cada run relê o catálogo inteiro da Scryfall
 e decide o que gravar via idempotência de arquivo (abaixo), não via delta da API.
 
-## 📁 Notebooks
+## Notebooks
 
 | Notebook | Fonte | Grão | Observação |
 |---|---|---|---|
@@ -88,7 +88,7 @@ notebooks — cada um só chama `run_stage_ingestion(table_name, endpoint,
 ingest_fn, S3_BASE_PATH)` e monta seu próprio relatório com o DataFrame
 devolvido).
 
-## 📄 Documentação de negócio (o que é cada tabela/coluna)
+## Documentação de negócio (o que é cada tabela/coluna)
 
 A Stage grava o dado como recebido da Scryfall, só mapeado 1:1 para os nomes
 de coluna esperados por Bronze/Silver (ex.: `type_line`→`type`,
@@ -115,7 +115,7 @@ camada). A Stage também não tem tabela no Unity Catalog (grava só Parquet no
 S3), então não há `COMMENT ON TABLE`/`ALTER COLUMN...COMMENT` aplicável aqui -
 a documentação de negócio da Stage é só este Markdown.
 
-## ⚙️ Segredos (scope `mtg-pipeline`)
+## Segredos (scope `mtg-pipeline`)
 
 ```
 scryfall_api_url     # URL base da Scryfall API
@@ -125,7 +125,7 @@ years_back            # Janela temporal em anos (padrão: 5)
 max_retries           # Tentativas de retry por request HTTP (padrão: 3)
 ```
 
-## 🗂️ Estrutura no S3
+## Estrutura no S3
 
 ```
 s3://{bucket}/{stage_prefix}/
@@ -152,7 +152,7 @@ s3://{bucket}/{stage_prefix}/
 
 Cada tabela tem sua própria pasta - antes os 6 arquivos viviam juntos num diretório flat, distinguidos só pelo sufixo do nome.
 
-## 🔁 Idempotência e controle de execução
+## Idempotência e controle de execução
 
 - **Nome de arquivo determinístico** — se o arquivo já existe, a run
   pula essa partição (`files_skipped`) em vez de sobrescrever. Os seis notebooks
@@ -172,13 +172,13 @@ Cada tabela tem sua própria pasta - antes os 6 arquivos viviam juntos num diret
   `FAILED` registrado no controle, sem tocar nos arquivos já gravados.
   Reprocessar é rodar o notebook de novo (idempotente por arquivo).
 
-## 🛡️ Erros e retry
+## Erros e retry
 
 `http_get_with_retry()` cobre todo request HTTP dos seis notebooks: retry com backoff
 em 429 e 5xx, timeout/erro de conexão também tenta de novo; 4xx (exceto 429) falha
 direto, sem retry (erro do cliente não muda tentando de novo).
 
-## 🧊 Imutabilidade
+## Imutabilidade
 
 O dado gravado é o dado recebido da Scryfall (mapeado 1:1 pros nomes de coluna
 esperados por Bronze/Silver, sem TRIM/normalização de acento/dedup/regra de negócio).
@@ -186,7 +186,7 @@ Campos exclusivos da extinta magicthegathering.io sem equivalente na Scryfall
 (`border`, `mkm_id`, `gathererCode`, etc.) ficam `None` — a coluna existe, só não tem
 dado de origem.
 
-## ⚠️ Fora de escopo da Stage
+## Fora de escopo da Stage
 
 Nome padronizado, dedup de negócio, PK/FK, modelagem dimensional, tratamento de NULL
 para consumo analítico — isso é Bronze/Silver. A Stage só garante que o dado chegou

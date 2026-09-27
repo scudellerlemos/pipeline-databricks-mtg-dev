@@ -235,11 +235,11 @@ print("RELATÓRIO DE INGESTÃO DE CARDS")
 print("=" * 50)
 
 if cards_df is not None:
-    print("✅ Arquivos salvos com sucesso")
-    print(f"📊 Total de registros: {cards_df.count()}")
-    print(f"🗂️ Coleções processadas: {len(set_codes)} (últimos {YEARS_BACK} anos)")
-    print("🎯 Particionamento: por ingestion_timestamp (ano/mês/dia da execução)")
+    print("Arquivos salvos com sucesso")
+    print(f"Total de registros: {cards_df.count()}")
+    print(f"Coleções processadas: {len(set_codes)} (últimos {YEARS_BACK} anos)")
+    print("Particionamento: por ingestion_timestamp (ano/mês/dia da execução)")
 else:
-    print("❌ Falha na ingestão de cards")
+    print("Falha na ingestão de cards")
 
 print("=" * 50)

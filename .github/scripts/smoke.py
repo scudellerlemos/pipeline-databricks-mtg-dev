@@ -72,7 +72,7 @@ def main():
     if not ok:
         return 1
     if not is_new_cli:
-        deploy.log("❌ smoke.py precisa da CLI nova (databricks/setup-cli)", "ERROR")
+        deploy.log("smoke.py precisa da CLI nova (databricks/setup-cli)", "ERROR")
         return 1
 
     payload = montar_payload()
@@ -80,21 +80,21 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
     try:
-        deploy.log(f"💨 Submetendo {payload['run_name']} ({payload['git_source'].get('git_tag') or payload['git_source'].get('git_branch')})...")
+        deploy.log(f"Submetendo {payload['run_name']} ({payload['git_source'].get('git_tag') or payload['git_source'].get('git_branch')})...")
         run_id = cli("jobs", "submit", "--json", f"@{JSON_TMP}", "--no-wait", "-o", "json").get("run_id")
         if not run_id:
-            deploy.log("❌ jobs submit nao devolveu run_id", "ERROR")
+            deploy.log("jobs submit nao devolveu run_id", "ERROR")
             return 1
-        deploy.log(f"🔗 run {run_id}")
+        deploy.log(f"run {run_id}")
 
         sucesso, estado = esperar(run_id)
         if sucesso:
-            deploy.log(f"✅ Smoke passou · run {run_id}")
+            deploy.log(f"Smoke passou · run {run_id}")
             return 0
-        deploy.log(f"❌ Smoke falhou · run {run_id} · {estado}", "ERROR")
+        deploy.log(f"Smoke falhou · run {run_id} · {estado}", "ERROR")
         return 1
     except subprocess.CalledProcessError as e:
-        deploy.log(f"❌ Erro na CLI: {e.stderr}", "ERROR")
+        deploy.log(f"Erro na CLI: {e.stderr}", "ERROR")
         return 1
     finally:
         if os.path.exists(JSON_TMP):

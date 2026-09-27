@@ -1,4 +1,4 @@
-# 📐 Decisões de Arquitetura (ADR)
+# Decisões de Arquitetura (ADR)
 
 Registro das decisões que moldam o projeto: o que foi decidido, por quê, e o que
 se aceitou em troca. Decisão nova entra no fim com o próximo número; decisão

@@ -183,10 +183,10 @@ print("RELATÓRIO DE INGESTÃO DE PREÇOS")
 print("=" * 50)
 
 if prices_df is not None:
-    print("✅ Arquivos salvos com sucesso")
-    print(f"📊 Total de registros: {prices_df.count()}")
-    print(f"🎯 Particionamento: por releaseDate (janela de {YEARS_BACK} anos)")
+    print("Arquivos salvos com sucesso")
+    print(f"Total de registros: {prices_df.count()}")
+    print(f"Particionamento: por releaseDate (janela de {YEARS_BACK} anos)")
 else:
-    print("❌ Falha na ingestão de preços")
+    print("Falha na ingestão de preços")
 
 print("=" * 50)

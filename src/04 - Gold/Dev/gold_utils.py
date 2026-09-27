@@ -234,7 +234,7 @@ def save_to_gold(df_final, catalog, schema, table_name, s3_gold_path,
         current_cols = set(f.name for f in DeltaTable.forPath(spark_session, delta_path).toDF().schema.fields)
         new_cols = set(df_final.columns)
         if current_cols != new_cols:
-            print(f"⚠️ Schema de {full_table_name} mudou: colunas removidas={sorted(current_cols - new_cols)}, "
+            print(f"Schema de {full_table_name} mudou: colunas removidas={sorted(current_cols - new_cols)}, "
                   f"colunas novas={sorted(new_cols - current_cols)}.")
 
         # <=> em vez de = : equality nula-segura, senão uma chave nula nunca daria
@@ -330,12 +330,12 @@ def run_data_quality_checks(spark_session, rotulo, checks):
         resultados[nome] = contagem
 
         if limite is None:
-            nivel = "ℹ️"
+            nivel = "INFO"
         elif contagem > limite:
-            nivel = "❌"
+            nivel = "FALHA"
             estourados.append(f"{nome}={contagem} (limite {limite})")
         else:
-            nivel = "✅"
+            nivel = "OK"
         print(f"{nivel} DQ [{rotulo}] {nome}: {contagem}")
 
     if estourados:
@@ -437,5 +437,5 @@ class GoldTableProcessor:
             column_comments=column_comments
         )
 
-        print(f"✅ {self.table_name} criada com sucesso!")
+        print(f"{self.table_name} criada com sucesso!")
         print(f"Tabela criada: {self.config['catalog_name']}.{self.config['schema_gold']}.{self.table_name}")

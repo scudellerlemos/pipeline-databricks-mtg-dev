@@ -158,6 +158,6 @@ def get_secret(secret_name, default_value=None, extra_safe_defaults=None):
             print(f"Secret '{secret_name}' não encontrado, usando valor padrão: {safe_defaults[secret_name]}")
             return _barra_catalogo_de_dev_em_producao(secret_name, safe_defaults[secret_name])
         else:
-            print(f"⚠️ Secret '{secret_name}' não encontrado e sem valor padrão")
-            print(f"💡 Configure o secret no scope ou a env var MTG_<NOME>")
+            print(f"Secret '{secret_name}' não encontrado e sem valor padrão")
+            print(f"Configure o secret no scope ou a env var MTG_<NOME>")
             raise Exception(f"Secret '{secret_name}' not configured and no default available")

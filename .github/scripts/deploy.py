@@ -176,15 +176,15 @@ def get_existing_job_id(job_name, is_new_cli=False):
         for job in jobs_list:
             if job.get("settings", {}).get("name") == job_name:
                 job_id = job.get("job_id")
-                log(f"✅ Job existente encontrado: {job_name} (ID {job_id})")
+                log(f"Job existente encontrado: {job_name} (ID {job_id})")
                 return job_id
-        log(f"ℹ️ Job {job_name} não existe ainda, será criado")
+        log(f"Job {job_name} não existe ainda, será criado")
         return None
     except subprocess.CalledProcessError as e:
-        log(f"⚠️ Erro ao listar jobs: {e.stderr}", "WARN")
+        log(f"Erro ao listar jobs: {e.stderr}", "WARN")
         return None
     except Exception as e:
-        log(f"⚠️ Erro inesperado ao listar jobs: {e}", "WARN")
+        log(f"Erro inesperado ao listar jobs: {e}", "WARN")
         return None
 
 
@@ -238,17 +238,17 @@ def fetch_job(job_id, is_new_cli):
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return json.loads(result.stdout).get("settings")
     except Exception as e:
-        log(f"⚠️ Não consegui ler o job {job_id}: {e}", "WARN")
+        log(f"Não consegui ler o job {job_id}: {e}", "WARN")
         return None
 
 
 def validate_databricks_connection():
     """Valida a conexão com o Databricks"""
     try:
-        log("🔗 Testando conexão com Databricks...")
+        log("Testando conexão com Databricks...")
         result = subprocess.run(["databricks", "--version"], capture_output=True, text=True, check=True)
         version_output = result.stdout.strip()
-        log(f"✅ Databricks CLI version: {version_output}")
+        log(f"Databricks CLI version: {version_output}")
 
         is_new_cli = version_output.startswith("Databricks CLI v")
         is_old_cli = version_output.startswith("Version ")
@@ -261,29 +261,29 @@ def validate_databricks_connection():
                     text=True,
                     check=True,
                 )
-                log("✅ CLI antiga configurada para Jobs API 2.1")
+                log("CLI antiga configurada para Jobs API 2.1")
             except subprocess.CalledProcessError as e:
-                log(f"⚠️ Configuração falhou: {e.stderr}", "WARN")
+                log(f"Configuração falhou: {e.stderr}", "WARN")
                 os.environ["DATABRICKS_JOBS_API_VERSION"] = "2.1"
 
         if is_new_cli:
             subprocess.run(["databricks", "workspace", "list", "/"], capture_output=True, text=True, check=True)
         else:
             subprocess.run(["databricks", "workspace", "list", "/"], capture_output=True, text=True, check=True)
-        log("✅ Conexão com workspace estabelecida")
+        log("Conexão com workspace estabelecida")
 
         return True, is_new_cli
     except subprocess.CalledProcessError as e:
-        log(f"❌ Erro na conexão com Databricks (exit {e.returncode}): stdout={e.stdout!r} stderr={e.stderr!r}", "ERROR")
+        log(f"Erro na conexão com Databricks (exit {e.returncode}): stdout={e.stdout!r} stderr={e.stderr!r}", "ERROR")
         return False, False
     except Exception as e:
-        log(f"❌ Erro inesperado na validação: {e}", "ERROR")
+        log(f"Erro inesperado na validação: {e}", "ERROR")
         return False, False
 
 
 def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
     """Deploya (cria ou atualiza) um job e retorna seu job_id."""
-    log(f"📖 Lendo {yaml_path} ({job_key} -> {job_name(job_key)})...")
+    log(f"Lendo {yaml_path} ({job_key} -> {job_name(job_key)})...")
     job_config = load_job_config(yaml_path, job_key, job_ids_by_key)
     write_json(job_config)
 
@@ -297,14 +297,14 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
         json_content = f.read()
 
     if existing_id:
-        log(f"🔄 Atualizando job existente: {job_config['name']} (ID {existing_id})")
+        log(f"Atualizando job existente: {job_config['name']} (ID {existing_id})")
         # jobs reset sobrescreve as settings INTEIRAS: o que alguem mudou na UI
         # morre aqui, calado. Nao da pra preservar (o YAML e a fonte da
         # verdade), mas da pra dizer o que esta sendo desfeito.
         atual = fetch_job(existing_id, is_new_cli)
         if atual:
             for drift in diferencas(campos_criticos(atual), campos_criticos(job_config)):
-                log(f"♻️ Sobrescrevendo {job_config['name']} · {drift}", "WARN")
+                log(f"Sobrescrevendo {job_config['name']} · {drift}", "WARN")
         if is_new_cli:
             write_json({"job_id": existing_id, "new_settings": job_config})
             result = subprocess.run(
@@ -334,11 +334,11 @@ def deploy_one_job(yaml_path, job_key, is_new_cli, job_ids_by_key):
         except Exception:
             job_id = None
 
-    log(f"📄 Resposta do Databricks para {job_key}: {result.stdout.strip()[:300]}")
+    log(f"Resposta do Databricks para {job_key}: {result.stdout.strip()[:300]}")
     if job_id is None:
         raise RuntimeError(f"Não foi possível determinar o job_id de {job_key} após o deploy")
 
-    log(f"🎯 {job_key} -> job_id {job_id}")
+    log(f"{job_key} -> job_id {job_id}")
     return job_id, job_config
 
 
@@ -356,12 +356,12 @@ def deploy_all():
             enviado_por_id[job_id] = job_config
         return True, is_new_cli, enviado_por_id
     except subprocess.CalledProcessError as e:
-        log(f"❌ Erro no deploy: {e}", "ERROR")
-        log(f"📄 stdout: {e.stdout}", "DEBUG")
-        log(f"📄 stderr: {e.stderr}", "ERROR")
+        log(f"Erro no deploy: {e}", "ERROR")
+        log(f"stdout: {e.stdout}", "DEBUG")
+        log(f"stderr: {e.stderr}", "ERROR")
         return False, is_new_cli, enviado_por_id
     except Exception as e:
-        log(f"❌ Erro inesperado: {e}", "ERROR")
+        log(f"Erro inesperado: {e}", "ERROR")
         return False, is_new_cli, enviado_por_id
 
 
@@ -377,15 +377,15 @@ def verify_deployment(enviado_por_id, is_new_cli):
     Um run de verdade leva ~20min e bate no Scryfall - isso e a run agendada.
     """
     if not enviado_por_id:
-        log("❌ Nenhum job foi deployado", "ERROR")
+        log("Nenhum job foi deployado", "ERROR")
         return False
 
-    log("🔍 Relendo os jobs deployados...")
+    log("Relendo os jobs deployados...")
     all_ok = True
     for job_id, enviado in enviado_por_id.items():
         lido = fetch_job(job_id, is_new_cli)
         if lido is None:
-            log(f"❌ {enviado['name']} (ID {job_id}) não pôde ser lido de volta", "ERROR")
+            log(f"{enviado['name']} (ID {job_id}) não pôde ser lido de volta", "ERROR")
             all_ok = False
             continue
 
@@ -393,9 +393,9 @@ def verify_deployment(enviado_por_id, is_new_cli):
         if divergencias:
             all_ok = False
             for d in divergencias:
-                log(f"❌ {enviado['name']} não bateu · {d}", "ERROR")
+                log(f"{enviado['name']} não bateu · {d}", "ERROR")
         else:
-            log(f"✅ {enviado['name']} (ID {job_id}) confere")
+            log(f"{enviado['name']} (ID {job_id}) confere")
     return all_ok
 
 
@@ -404,42 +404,42 @@ def cleanup():
     try:
         if os.path.exists(JSON_TMP):
             os.remove(JSON_TMP)
-            log("🧹 Arquivo temporário removido")
+            log("Arquivo temporário removido")
     except Exception as e:
-        log(f"⚠️ Erro na limpeza: {e}", "WARN")
+        log(f"Erro na limpeza: {e}", "WARN")
 
 
 if __name__ == "__main__":
-    log("🚀 Iniciando deploy do pipeline...")
+    log("Iniciando deploy do pipeline...")
     if not TARGET["alert_email"]:
-        log("⚠️ MTG_ALERT_EMAIL vazio: os jobs sobem SEM alerta de falha", "WARN")
+        log("MTG_ALERT_EMAIL vazio: os jobs sobem SEM alerta de falha", "WARN")
     log("=" * 60)
 
     try:
         deploy_success, is_new_cli, enviado_por_id = deploy_all()
 
         if deploy_success:
-            log("✅ Deploy executado com sucesso!")
+            log("Deploy executado com sucesso!")
             verify_success = verify_deployment(enviado_por_id, is_new_cli)
 
             if verify_success:
-                log("🎉 Deploy e verificação concluídos com sucesso!")
+                log("Deploy e verificação concluídos com sucesso!")
                 log("=" * 60)
                 sys.exit(0)
             else:
-                log("⚠️ Deploy executado mas verificação falhou", "WARN")
+                log("Deploy executado mas verificação falhou", "WARN")
                 log("=" * 60)
                 sys.exit(1)
         else:
-            log("💥 Falha no deploy!", "ERROR")
+            log("Falha no deploy!", "ERROR")
             log("=" * 60)
             sys.exit(1)
 
     except KeyboardInterrupt:
-        log("⚠️ Deploy interrompido pelo usuário", "WARN")
+        log("Deploy interrompido pelo usuário", "WARN")
         sys.exit(1)
     except Exception as e:
-        log(f"💥 Erro crítico: {e}", "ERROR")
+        log(f"Erro crítico: {e}", "ERROR")
         sys.exit(1)
     finally:
         cleanup()

@@ -58,7 +58,7 @@ jobs:
         for f in ['.github/DAGs/stage.yml', '.github/DAGs/bronze.yml', '.github/DAGs/pipeline.yml', '.github/DAGs/silver.yml', '.github/DAGs/gold.yml']:
             yaml.safe_load(open(f, 'r', encoding='utf-8'))
         "
-        echo "✅ YAML syntax is valid"
+        echo "YAML syntax is valid"
 
     - name: Validate pipeline structure, notebooks, cluster and git config
       run: python .github/scripts/validate_dag.py
@@ -74,14 +74,14 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const comment = `## ✅ Validação estática concluída
+          const comment = `## Validação estática concluída
 
-          - ✅ Sintaxe YAML válida
-          - ✅ Estrutura do pipeline, notebooks, cluster e git
-          - ✅ Lint estático das células Python (ruff F821/F822/F823)
-          - ✅ Suíte de testes unitários (pytest)
+          - Sintaxe YAML válida
+          - Estrutura do pipeline, notebooks, cluster e git
+          - Lint estático das células Python (ruff F821/F822/F823)
+          - Suíte de testes unitários (pytest)
 
-          ⚠️ Nada foi executado num cluster. O smoke test roda no merge.`;
+          Nada foi executado num cluster. O smoke test roda no merge.`;
 
           github.rest.issues.createComment({
             issue_number: context.issue.number,
@@ -144,7 +144,7 @@ jobs:
     - name: Resumo
       run: |
         {
-          echo "## 🚀 Deploy em dev concluído"
+          echo "## Deploy em dev concluído"
           echo ""
           echo "- Jobs: MTG_STAGE, MTG_BRONZE, MTG_SILVER, MTG_GOLD, MTG_PIPELINE"
           echo "- Catálogo: \`mtg_dev\` · schedule PAUSADO (dev roda sob demanda)"

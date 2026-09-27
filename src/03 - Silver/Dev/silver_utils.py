@@ -299,7 +299,7 @@ def save_to_silver(df_final, catalog, schema, table_name, s3_silver_path,
         current_cols = set(f.name for f in DeltaTable.forPath(spark_session, delta_path).toDF().schema.fields)
         new_cols = set(df_final.columns)
         if current_cols != new_cols:
-            print(f"⚠️ Schema de {full_table_name} mudou: colunas removidas={sorted(current_cols - new_cols)}, "
+            print(f"Schema de {full_table_name} mudou: colunas removidas={sorted(current_cols - new_cols)}, "
                   f"colunas novas={sorted(new_cols - current_cols)}.")
 
         # <=> em vez de = : equality nula-segura, senão uma chave nula nunca daria
@@ -385,5 +385,5 @@ class SilverTableProcessor:
             column_comments=column_comments
         )
 
-        print(f"✅ {self.table_name} criada com sucesso!")
+        print(f"{self.table_name} criada com sucesso!")
         print(f"Tabela criada: {self.config['catalog_name']}.{self.config['schema_silver']}.{self.table_name}")

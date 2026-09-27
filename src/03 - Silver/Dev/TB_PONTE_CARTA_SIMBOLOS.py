@@ -101,7 +101,7 @@ def transform_ponte_carta_simbolos(df_cartas, df_simbolos):
     qtd_simbolo_nao_catalogado = df_final.join(
         df_simbolos, on="COD_SIMBOLO", how="left_anti"
     ).count()
-    nivel = "⚠️" if qtd_simbolo_nao_catalogado > 0 else "✅"
+    nivel = "AVISO" if qtd_simbolo_nao_catalogado > 0 else "OK"
     print(f"{nivel} DQ simbolos_sem_match_em_TB_DOM_SIMBOLOS: {qtd_simbolo_nao_catalogado}")
 
     logger.info(f"Transformação Ponte Carta x Símbolos concluída: {df_final.count()} registros")

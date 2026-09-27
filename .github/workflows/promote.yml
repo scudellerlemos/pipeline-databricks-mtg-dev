@@ -84,7 +84,7 @@ jobs:
           fi
           git tag "$TAG"
           git push -q origin HEAD:main "refs/tags/$TAG"
-          echo "✅ $TAG publicada em pipeline-databricks-mtg-prd"
+          echo "$TAG publicada em pipeline-databricks-mtg-prd"
 
       - name: Disparar deploy no repo de produção
         env:
