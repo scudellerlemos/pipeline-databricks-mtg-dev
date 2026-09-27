@@ -2,7 +2,6 @@
 
 <div align="center">
 
-<!-- Imagem ilustrativa da tabela (adicione o link abaixo) -->
 ![RED XIII - Proud Warrior](https://img.mypcards.com/img/1/137/magic_ddajvc_001/magic_ddajvc_001_en.jpg)
 
 
@@ -132,7 +131,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 ### Tratamento de Erros e Recuperação
 - **Verificação de existência**: Antes de criar/atualizar tabelas
 - **Upsert por chave**: linha com chave existente é sobrescrita inteira (`whenMatchedUpdateAll`); só linhas fora do lote atual ficam intocadas
-- **Rollback automático**: Em caso de falha no merge
+- **Atomicidade**: MERGE do Delta é transacional; falha não deixa escrita parcial
 - **Logs detalhados**: Para debugging e auditoria
 
 ### Logs e Monitoramento
@@ -201,14 +200,9 @@ Após o processamento na Silver, os dados estarão disponíveis para:
 #### 2. Incrementalidade
 - Merge por chave
 - Preservação de histórico
-- Performance otimizada
-- Recuperação de falhas
 
 #### 3. Governança
 - Unity Catalog para controle
-- Permissões granulares
-- Rastreabilidade completa
-- Auditoria de mudanças
 
 #### 4. Qualidade
 - Validação de integridade

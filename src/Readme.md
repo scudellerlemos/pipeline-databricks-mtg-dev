@@ -77,7 +77,6 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - Enriquecimento com categorias e métricas
 - Nomenclatura 100% PT-BR com prefixo semântico (ID_, NME_, DESC_, COD_, DT_, ANO_, MES_, QTD_, VLR_, NUM_, FLG_, URL_)
 - Nomenclatura de tabela DAMA-DMBOK (Fato/Dimensão/Domínio/Ponte)
-- Qualidade de dados garantida
 - Regras de negócio em SQL, com duas exceções em Python: a normalização de texto (`normalizar_valores`, UDF) e a resolução da cadeia de migrações de ID (`attach_canonical_id` em TB_MOV_MIGRACOES_CARTAS, no driver)
 
 **Tabelas**:
@@ -176,7 +175,6 @@ save_to_gold(df_gold, catalog_name, "gold", "TB_FATO_MERCADO_CARTAS", s3_gold_pa
 ### Performance
 - **Ingestão**: bulk-data em 1 download por tabela (cards/card_prices de `default_cards`, rulings de `rulings`); /sets e /symbology em 1 request; /migrations paginado
 - **Processamento**: Incremental por chaves específicas
-- **Tempo de Execução**: <50 minutos para pipeline completo
 
 ### Qualidade
 - **Bronze**: Preservação de dados originais
@@ -234,18 +232,13 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 
 ### Otimizações
 - Particionamento avançado por múltiplas dimensões
-- Cache inteligente para consultas frequentes
 - Otimização de queries com Z-Order
-- Monitoramento avançado de performance
 
 ---
 
 ## Suporte e Contato
 
 Para dúvidas, sugestões ou problemas:
-- Verificar documentação específica de cada camada
-- Consultar logs de execução no Databricks
-- Revisar configurações de segredos e permissões
-- Verificar status do Unity Catalog e Delta Lake
+- Documentação de cada camada (`src/*/Readme.md`)
+- Logs das runs no Databricks
 
-**Que a magia dos dados esteja sempre com você!** 

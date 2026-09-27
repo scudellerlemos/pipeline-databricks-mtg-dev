@@ -9,7 +9,7 @@ Dominio: lista pequena e quase estatica, uma linha por simbolo.
 Chave unica: COD_SIMBOLO (nunca nulo na fonte), declarada como PRIMARY KEY.
 
 COD_SIMBOLO troca chaves por colchetes ("{2/U}" -> "[2/U]"), a mesma notacao
-de DESC_CUSTO_MANA em TB_FATO_CARTAS, para a Gold conseguir fazer o join.
+de DESC_CUSTO_MANA em TB_FATO_CARTAS, para casar com TB_PONTE_CARTA_SIMBOLOS.
 COD_SIMBOLO nao passa por normalizar_valor().
 
 Mesma convencao de nome/case de TB_FATO_CARTAS. Sem particionamento: tabela

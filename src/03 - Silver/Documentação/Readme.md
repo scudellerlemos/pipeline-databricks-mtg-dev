@@ -2,7 +2,6 @@
 <br>
 <br>
 <div align="center">
-<!-- Imagem ilustrativa da tabela (adicione o link abaixo) -->
 <img src="https://i.postimg.cc/1t61LYFb/doc.png" alt="Imagem de documentação" width="400"/>
 </div>
 <br>
