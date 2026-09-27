@@ -1,13 +1,13 @@
 name: Deploy produção (MTG)
 
-# ATENCAO: este arquivo NAO roda neste repo. Ele e o conteudo do unico arquivo
-# do repo de controle de producao (pipeline-databricks-mtg-prd), onde vive como
-# .github/workflows/deploy-prd.yml. A copia fica versionada aqui porque o
-# desenho dos jobs de prod tem que passar pela mesma revisao que o codigo.
+# ATENCAO: este arquivo NAO roda no repo de dev. O promote.yml de la copia
+# o snapshot da tag pro repo de producao (pipeline-databricks-mtg-prd) e poe
+# este arquivo em .github/workflows/deploy-prd.yml. Ele fica versionado no dev
+# porque o desenho dos jobs de prod passa pela mesma revisao que o codigo.
 #
-# O repo de controle nao guarda copia de src/ nem dos DAGs: ele faz checkout
-# DESTE repo na tag promovida e roda o mesmo deploy.py. Assim nao existe
-# segunda copia do pipeline pra divergir da primeira.
+# Os jobs de prod leem o codigo DO REPO DE PRODUCAO, nunca do de dev: la o dev
+# tem liberdade de apagar tag, dar force-push, ate apagar o repo, e nada disso
+# pode derrubar producao. O que roda aqui so muda por uma promocao.
 
 on:
   repository_dispatch:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag do repo de código a deployar (ex.: v1.0.0)"
+        description: "Tag deste repo a deployar (ex.: v1.0.0)"
         required: true
 
 # Dois deploys de prod simultaneos deixariam metade dos jobs numa tag e
@@ -27,7 +27,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  CODE_REPO: scudellerlemos/pipeline-databricks-mtg-dev
+  # Este proprio repo: o codigo chega aqui pela promocao, nao e lido do dev.
+  CODE_REPO: ${{ github.repository }}
 
 jobs:
   deploy:
