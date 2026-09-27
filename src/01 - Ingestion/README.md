@@ -66,6 +66,13 @@ de arquivo (abaixo), não via delta da API. O que a API oferece (conferido em 09
 Os bulks são regenerados diariamente pela Scryfall: a frequência mensal é escolha
 do pipeline, não limite da fonte.
 
+**Escopo fechado (decisão de produto, 09/2026):**
+
+- **Frequência mensal**, inclusive para preço - 1 ponto por impressão por mês.
+- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção. Fica de fora
+  ~43% das cartas (as sem impressão na janela) e as impressões antigas das cartas que
+  estão dentro - de propósito.
+
 ## Notebooks
 
 | Notebook | Fonte | Grão | Observação |
