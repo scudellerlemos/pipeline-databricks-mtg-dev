@@ -1,11 +1,8 @@
 name: Promover tag para produção
 
-# Merge na main = producao. Quando o CI da main termina verde (validacao +
-# deploy de dev), publica o snapshot desse commit no repo de producao
-# (pipeline-databricks-mtg-prd): copia o codigo, commita, cria uma tag
-# prd-<data>-<sha> (e ela que o rollback redeploya) e dispara o deploy. Os
-# jobs de prod leem de la, entao nada que aconteca neste repo depois - tag,
-# force-push, branch apagada - chega em producao sem passar por aqui.
+# Merge na main = producao. Quando o CI da main termina verde, copia o codigo
+# desse commit pro repo pipeline-databricks-mtg-prd, cria a tag prd-<data>-<sha>
+# (usada no rollback) e dispara o deploy de la.
 # O PAT precisa de "Contents" e "Workflows" com escrita no -prd.
 
 on:
@@ -21,9 +18,8 @@ concurrency:
 
 jobs:
   publicar-em-producao:
-    # So push na main que passou em tudo. O filtro de branch do workflow_run
-    # olha so o nome (um PR vindo da main de um fork casaria), e CI vermelho
-    # nunca vira producao.
+    # So push na main com CI verde. O filtro de branch do workflow_run olha so o
+    # nome, entao um PR vindo da main de um fork tambem casaria.
     if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
@@ -31,7 +27,7 @@ jobs:
     env:
       SHA: ${{ github.event.workflow_run.head_sha }}
     steps:
-      # O commit que o CI validou, nao o que estiver na ponta da main agora.
+      # O commit que o CI validou, nao a ponta atual da main.
       - name: Checkout do commit validado
         uses: actions/checkout@v4
         with:
@@ -44,10 +40,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
         run: |
-          # Descoberto na v1.0.0: o secret existia com valor VAZIO (um
-          # `gh secret set` sem stdin interativo). A mensagem do gh era
-          # "set the GH_TOKEN environment variable", que manda procurar o bug
-          # no workflow em vez de no secret.
+          # Secret vazio faz o gh falhar com "set the GH_TOKEN environment
+          # variable", que aponta pro workflow e nao pro secret.
           if [ -z "$GH_TOKEN" ]; then
             echo "::error::PRD_DISPATCH_TOKEN vazio ou ausente. Merge feito mas producao nao foi publicada."
             echo "Corrija com: gh secret set PRD_DISPATCH_TOKEN --repo ${GITHUB_REPOSITORY} --body '<pat>'"
@@ -61,10 +55,9 @@ jobs:
           token: ${{ secrets.PRD_DISPATCH_TOKEN }}
           path: .prd
 
-      # Snapshot inteiro, com --delete: arquivo apagado aqui some la tambem.
-      # .github/workflows fica de fora - os workflows DESTE repo (CI, deploy
-      # de dev, esta promocao) nao podem rodar em producao. La so existe o
-      # deploy-prd.yml, que vem da copia revisada em .github/prd/.
+      # Copia tudo com --delete (arquivo apagado aqui some la). .github/workflows
+      # fica de fora (os workflows de dev nao podem rodar em prd); o unico workflow
+      # de la e a copia de .github/prd/deploy-prd.yml.
       - name: Publicar o snapshot no repo de produção
         run: |
           rsync -a --delete --exclude .git --exclude .prd --exclude .github/workflows ./ .prd/
@@ -74,17 +67,19 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"
           git add -A
-          # Commit vazio (ex.: force-push que so reescreveu mensagens) publica e
-          # deploya, mas nao reprocessa: nenhum arquivo mudou.
-          if git commit -q -m "Publica $TAG (dev $SHA)"; then
+          # Reprocessa so se mudou algo alem de documentacao (*.md e docs/).
+          # Sem mudanca ou so doc: publica e deploya a tag, mas nao roda o pipeline.
+          # quotepath=off: sem isso o git poe entre aspas caminho com acento e o $ do regex nao casa.
+          if git -c core.quotepath=off diff --cached --name-only | grep -qvE '\.md$|^docs/'; then
             echo "RODAR=true" >> "$GITHUB_ENV"
           else
-            echo "Nada mudou desde a ultima publicacao."
+            echo "Sem mudanca de codigo: publica sem rodar o pipeline."
             echo "RODAR=false" >> "$GITHUB_ENV"
           fi
+          git commit -q -m "Publica $TAG (dev $SHA)" || echo "Nada mudou desde a ultima publicacao."
           git tag "$TAG"
           git push -q origin HEAD:main "refs/tags/$TAG"
-          echo "✅ $TAG publicada em pipeline-databricks-mtg-prd"
+          echo "$TAG publicada em pipeline-databricks-mtg-prd"
 
       - name: Disparar deploy no repo de produção
         env:
