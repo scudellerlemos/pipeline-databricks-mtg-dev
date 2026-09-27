@@ -171,8 +171,13 @@ def obter_comentario_tabela(nome_tabela_silver):
 
 
 def obter_comentarios_colunas(nome_tabela_silver):
-    """COLUNAS_COMUNS + colunas específicas da tabela (específica vence em conflito de chave)."""
+    """COLUNAS_COMUNS + colunas específicas da tabela (específica vence em conflito de chave).
+
+    TB_PONTE_CARTA_SIMBOLOS não tem as colunas de linhagem, só as próprias.
+    """
     colunas_tabela = TABELAS_SILVER.get(nome_tabela_silver, {}).get("columns", {})
+    if nome_tabela_silver == "TB_PONTE_CARTA_SIMBOLOS":
+        return dict(colunas_tabela)
     return {**COLUNAS_COMUNS, **colunas_tabela}
 
 
@@ -184,4 +189,5 @@ if __name__ == "__main__":
     assert comentarios_cartas["NME_CARTA"] == TABELAS_SILVER["TB_FATO_CARTAS"]["columns"]["NME_CARTA"]
     assert obter_comentario_tabela("inexistente") is None
     assert obter_comentarios_colunas("inexistente") == COLUNAS_COMUNS
+    assert "DT_INGESTAO" not in obter_comentarios_colunas("TB_PONTE_CARTA_SIMBOLOS")
     print("silver_column_docs: OK")

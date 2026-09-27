@@ -160,13 +160,17 @@ def _carimbo_da_execucao(execucao):
 
 
 def salvar_em_parquet(spark, dados, nome_tabela, caminho_base, esquema=None,
-                     coluna_origem_particao=None, data_corte=None, execucao=None):
+                     coluna_origem_particao=None, data_corte=None, execucao=None,
+                     colunas_obrigatorias=None):
     """
     coluna_origem_particao: coluna já presente no dado (ex.: 'releaseDate') usada para
         derivar partition_year/partition_month. Se None, usa a data de ingestão (agora).
     data_corte: se informado, mantém apenas registros com coluna_origem_particao >= data_corte.
     execucao: dict de iniciar_execucao(), opcional - se informado, acumula files_written/
         files_skipped/records_written nele para o controle de execução.
+    colunas_obrigatorias: colunas que não podem vir nulas depois do mapeamento. Um
+        nulo aborta antes de gravar: campo renomeado ou movido na Scryfall vira
+        NULL em silêncio e só estouraria no DQ da Gold.
     """
     if not dados:
         print(f"Nenhum dado para salvar na tabela {nome_tabela}")
@@ -199,6 +203,12 @@ def salvar_em_parquet(spark, dados, nome_tabela, caminho_base, esquema=None,
         else:
             df = df.withColumn("partition_year", year(col("ingestion_timestamp"))) \
                    .withColumn("partition_month", month(col("ingestion_timestamp")))
+
+        if colunas_obrigatorias:
+            nulos = df.selectExpr(*[f"count_if(`{c}` IS NULL) AS `{c}`" for c in colunas_obrigatorias]).first().asDict()
+            nulos = {c: n for c, n in nulos.items() if n}
+            if nulos:
+                raise ValueError(f"colunas obrigatórias com nulo em {nome_tabela}: {nulos} - nada foi gravado")
 
         data_execucao = _carimbo_da_execucao(execucao).strftime("%Y%m%d")
         combinacoes_particao = df.select("partition_year", "partition_month").distinct().collect()

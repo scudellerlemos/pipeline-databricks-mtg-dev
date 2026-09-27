@@ -144,3 +144,57 @@ def obter_segredo(nome_segredo, valor_padrao=None, padroes_seguros_extras=None):
             print(f"Secret '{nome_segredo}' não encontrado e sem valor padrão")
             print(f"Configure o secret no scope ou a env var MTG_<NOME>")
             raise Exception(f"Secret '{nome_segredo}' not configured and no default available")
+
+# ============================================================================
+# CONTRATO DE SCHEMA
+# ============================================================================
+class ErroContratoEsquema(RuntimeError):
+    """Lote quebra o contrato de schema da tabela - nada foi gravado."""
+
+
+def campos_do_esquema(esquema):
+    """{coluna: tipo} de um StructType (df.schema), sem olhar nulabilidade."""
+    return {f.name: f.dataType.simpleString() for f in esquema.fields}
+
+
+def validar_contrato_esquema(nome_tabela, campos_atuais, campos_novos,
+                             colunas_documentadas=None, permitir_quebra=False):
+    """Compara o lote com a tabela antes de gravar. Aborta se quebrar o contrato.
+
+    campos_atuais/campos_novos: {coluna: tipo}; campos_atuais vazio = primeira carga.
+    - Coluna nova entra, com aviso (evolução aditiva).
+    - Coluna removida ou com tipo alterado aborta, a não ser com
+      permitir_quebra=True (mudança intencional, declarada no notebook).
+    - colunas_documentadas (column_docs da camada): o lote tem que ter
+      exatamente essas colunas. Vale mesmo com permitir_quebra.
+
+    Returns:
+        list: colunas novas no lote.
+    """
+    colunas_novas = sorted(set(campos_novos) - set(campos_atuais)) if campos_atuais else []
+    removidas = sorted(set(campos_atuais) - set(campos_novos))
+    tipo_alterado = sorted(
+        f"{c} ({campos_atuais[c]} -> {campos_novos[c]})"
+        for c in campos_novos if c in campos_atuais and campos_novos[c] != campos_atuais[c]
+    )
+
+    problemas = []
+    if removidas and not permitir_quebra:
+        problemas.append(f"colunas removidas {removidas}")
+    if tipo_alterado and not permitir_quebra:
+        problemas.append(f"tipo alterado {tipo_alterado}")
+    if colunas_documentadas is not None:
+        sem_doc = sorted(set(campos_novos) - set(colunas_documentadas))
+        doc_sem_coluna = sorted(set(colunas_documentadas) - set(campos_novos))
+        if sem_doc:
+            problemas.append(f"colunas sem documentação no column_docs {sem_doc}")
+        if doc_sem_coluna:
+            problemas.append(f"colunas documentadas que o lote não tem {doc_sem_coluna}")
+
+    if problemas:
+        raise ErroContratoEsquema(f"Contrato de schema de {nome_tabela} quebrado: " + "; ".join(problemas))
+    if removidas or tipo_alterado:
+        print(f"[schema] {nome_tabela}: quebra permitida - removidas={removidas} tipo_alterado={tipo_alterado}")
+    if colunas_novas:
+        print(f"[schema] {nome_tabela}: colunas novas {colunas_novas}")
+    return colunas_novas

@@ -87,6 +87,7 @@ def ingerir_esclarecimentos(nome_tabela="rulings", execucao=None):
     df = salvar_em_parquet(
         spark, dados_tabela, nome_tabela, CAMINHO_S3_STAGE,
         esquema=ESQUEMA_ESCLARECIMENTOS,
+        colunas_obrigatorias=["oracle_id", "published_at", "comment"],
         execucao=execucao,
     )
 

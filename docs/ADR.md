@@ -80,6 +80,11 @@ por curiosidade — sem duplicar dado.
 - **Silver** e **Gold** deduplicam a origem pela chave de negócio (`row_number`
   na Silver quando há coluna de ordenação, senão `dropDuplicates`; na Gold, chave duplicada no lote aborta a run) e gravam com merge do Delta (`DeltaTable.merge`) por essa
   chave. Na primeira carga, sem tabela ainda, é `overwrite`.
+- Toda camada valida o schema antes de gravar: a Stage aborta se coluna
+  obrigatória vier nula (`colunas_obrigatorias` no `salvar_em_parquet`); Bronze,
+  Silver e Gold comparam o lote com a tabela e com o `*_column_docs`
+  (`validar_contrato_esquema`). Coluna nova passa; coluna removida ou tipo
+  alterado só com `permitir_quebra_esquema=True`.
 
 **Consequências.** Toda camada é idempotente, o que viabiliza a [ADR-011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd)
 (rodar a cada publicação). A Bronze só cresce; se o volume algum dia pesar, a

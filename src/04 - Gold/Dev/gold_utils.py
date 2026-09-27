@@ -36,7 +36,7 @@ from delta.tables import DeltaTable
 # são buscadas no user_ns do IPython (mesmo esquema de silver_utils.py).
 # ============================================================================
 try:
-    obter_sessao_spark, obter_segredo, configurar_unity_catalog
+    obter_sessao_spark, obter_segredo, configurar_unity_catalog, validar_contrato_esquema, campos_do_esquema
 except NameError:
     try:
         import IPython
@@ -44,6 +44,8 @@ except NameError:
         obter_sessao_spark = _namespace_usuario["obter_sessao_spark"]
         obter_segredo = _namespace_usuario["obter_segredo"]
         configurar_unity_catalog = _namespace_usuario["configurar_unity_catalog"]
+        validar_contrato_esquema = _namespace_usuario["validar_contrato_esquema"]
+        campos_do_esquema = _namespace_usuario["campos_do_esquema"]
     except Exception:
         pass
 # ============================================================================
@@ -158,7 +160,7 @@ def _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, co
 # ============================================================================
 def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
                    colunas_particao=None, coluna_chave=None,
-                   comentario_tabela=None, comentarios_colunas=None):
+                   comentario_tabela=None, comentarios_colunas=None, permitir_quebra_esquema=False):
     """
     LOAD: grava df_final na camada Gold (Delta + Unity Catalog).
 
@@ -174,7 +176,10 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         comentario_tabela (str, optional): descrição de negócio da tabela (ver
             gold_column_docs.py).
         comentarios_colunas (dict, optional): {nome_coluna: descrição de negócio}
-            (ver gold_column_docs.py).
+            (ver gold_column_docs.py). As chaves são o contrato de nomes: o lote tem
+            que ter exatamente essas colunas.
+        permitir_quebra_esquema (bool): True só para remover coluna ou mudar
+            tipo de propósito. Sem isso, o contrato aborta antes de gravar.
     """
     if not caminho_s3_gold.startswith("s3://"):
         caminho_s3_gold = f"s3://{caminho_s3_gold}"
@@ -198,6 +203,14 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
 
     arquivos_existem = DeltaTable.isDeltaTable(sessao_spark, caminho_delta)
 
+    # Contrato de schema antes de qualquer escrita (ver base_utils).
+    campos_atuais = campos_do_esquema(DeltaTable.forPath(sessao_spark, caminho_delta).toDF().schema) if arquivos_existem else {}
+    validar_contrato_esquema(
+        nome_completo_tabela, campos_atuais, campos_do_esquema(df_final.schema),
+        colunas_documentadas=list(comentarios_colunas) if comentarios_colunas else None,
+        permitir_quebra=permitir_quebra_esquema,
+    )
+
     if not arquivos_existem:
         print(f"Delta ainda não existe em {caminho_delta}. Criando (primeira carga).")
         escritor = df_final.write.format("delta").mode("overwrite")
@@ -208,12 +221,6 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
 
     elif coluna_chave:
         colunas_chave = [coluna_chave] if isinstance(coluna_chave, str) else list(coluna_chave)
-
-        colunas_atuais = set(f.name for f in DeltaTable.forPath(sessao_spark, caminho_delta).toDF().schema.fields)
-        colunas_novas = set(df_final.columns)
-        if colunas_atuais != colunas_novas:
-            print(f"Schema de {nome_completo_tabela} mudou: colunas removidas={sorted(colunas_atuais - colunas_novas)}, "
-                  f"colunas novas={sorted(colunas_novas - colunas_atuais)}.")
 
         # <=> (null-safe): com "=", chave nula nunca casa e seria reinserida a cada run.
         condicao_merge = " AND ".join(f"gold.{k} <=> novo.{k}" for k in colunas_chave)
@@ -385,7 +392,8 @@ class GoldTableProcessor:
         return df
 
     def salvar_tabela_gold(self, df, colunas_particao=None, coluna_chave=None,
-                           comentario_tabela=None, comentarios_colunas=None):
+                           comentario_tabela=None, comentarios_colunas=None,
+                           permitir_quebra_esquema=False):
         """Salva tabela na Gold com configurações padrão"""
         salvar_na_gold(
             df_final=df,
@@ -396,7 +404,8 @@ class GoldTableProcessor:
             colunas_particao=colunas_particao,
             coluna_chave=coluna_chave,
             comentario_tabela=comentario_tabela,
-            comentarios_colunas=comentarios_colunas
+            comentarios_colunas=comentarios_colunas,
+            permitir_quebra_esquema=permitir_quebra_esquema
         )
 
         print(f"{self.nome_tabela} criada com sucesso!")

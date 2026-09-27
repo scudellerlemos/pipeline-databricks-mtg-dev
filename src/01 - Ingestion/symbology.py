@@ -106,6 +106,7 @@ def ingerir_simbolos(execucao=None):
     df = salvar_em_parquet(
         spark, dados_tabela, "symbology", CAMINHO_S3_STAGE,
         esquema=ESQUEMA_SIMBOLOS,
+        colunas_obrigatorias=["symbol"],
         execucao=execucao,
     )
 

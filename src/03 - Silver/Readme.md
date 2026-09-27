@@ -165,7 +165,7 @@ tabela_delta.alias("silver").merge(df_final.alias("novo"), "silver.ID_CARTA <=> 
 ```
 
 ### Compatibilidade e Enriquecimento de Schema
-- Diferença de schema é só logada; coluna nova entra via `withSchemaEvolution()` no merge
+- Contrato de schema antes de gravar (`validar_contrato_esquema` em base_utils): as colunas do lote têm que ser exatamente as do `silver_column_docs`; coluna removida ou tipo alterado em relação à tabela aborta, a não ser com `permitir_quebra_esquema=True`. Coluna nova entra via `withSchemaEvolution()` no merge (o mesmo vale na Gold)
 - Renomeação e padronização de colunas
 - Enriquecimento com colunas derivadas (ex: categorias, flags, métricas)
 - Preservação de dados existentes
