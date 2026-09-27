@@ -3,7 +3,8 @@ name: Promover tag para produção
 # Este repo e o dono do CODIGO. Quem deploya producao e o repo de controle
 # (pipeline-databricks-mtg-prd), que nao tem copia de nada: ele faz checkout
 # DESTE repo na tag e roda o mesmo .github/scripts/deploy.py com as variaveis
-# de prod. Por isso aqui so avisa - nao copia arquivo nenhum.
+# de prod. Por isso aqui so avisa - o unico arquivo copiado e o proprio
+# workflow de la, que tem que morar no repo de controle.
 on:
   push:
     tags: ['v*']
@@ -31,6 +32,26 @@ jobs:
             exit 1
           fi
           echo "✅ $GITHUB_REF_NAME esta na main"
+
+      # O workflow do repo de controle e a copia em .github/prd/, mas antes
+      # so mudava na mao - e na v1.0.0 ficou sem o requests e o deploy caiu.
+      # Sincroniza antes do dispatch: o deploy roda o workflow DESTA tag.
+      # O PAT precisa de "Workflows: write" alem de "Contents: write".
+      - name: Sincronizar workflow do repo de produção
+        env:
+          GH_TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
+          ARQ: .github/workflows/deploy-prd.yml
+        run: |
+          [ -n "$GH_TOKEN" ] || exit 0  # o passo seguinte explica o secret vazio
+          API=repos/scudellerlemos/pipeline-databricks-mtg-prd/contents/$ARQ
+          SHA=$(gh api "$API" --jq .sha)
+          if gh api "$API" --jq .content | base64 -d | cmp -s - .github/prd/deploy-prd.yml; then
+            echo "Workflow de producao ja esta igual ao da $GITHUB_REF_NAME."
+          else
+            gh api -X PUT "$API" -f message="Sincroniza deploy-prd.yml da $GITHUB_REF_NAME" \
+              -f content="$(base64 -w0 .github/prd/deploy-prd.yml)" -f sha="$SHA" --silent
+            echo "Workflow de producao atualizado para o da $GITHUB_REF_NAME."
+          fi
 
       - name: Disparar deploy no repo de produção
         env:
