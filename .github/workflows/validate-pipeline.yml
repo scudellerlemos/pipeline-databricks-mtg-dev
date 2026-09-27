@@ -13,9 +13,10 @@ on:
       - '.github/DAGs/**'
       - '.github/workflows/**'
       - '.github/scripts/**'
-      # Nao tocam o dev, mas a promocao pra prd pega carona neste run.
-      - '.github/prd/**'
+      # Dependencias do CI (e do deploy de prd, que instala o mesmo arquivo).
       - '.github/requirements-ci.txt'
+      # Nao toca o dev, mas a promocao pra prd pega carona neste run.
+      - '.github/prd/**'
 
 # Dois merges seguidos na main = dois `jobs reset` correndo nos mesmos 5 jobs.
 # cancel-in-progress: false porque cancelar um deploy no meio deixa parte dos
@@ -90,9 +91,8 @@ jobs:
           });
 
   # ============================================================================
-  # DEPLOY EM DEV - todo push na main. Nao ha aprovacao exigida aqui (a main
-  # nao pede review): o portao humano vive no environment Databricks-Prod, no
-  # repo de controle, e vale so pra producao.
+  # DEPLOY EM DEV - todo push de codigo na main. Nao ha aprovacao exigida
+  # aqui nem em producao: projeto solo, o merge ja e a decisao (ADR-007).
   # ============================================================================
   deploy:
     needs: validate
@@ -120,7 +120,7 @@ jobs:
         python-version: '3.11'
 
     - name: Instalar dependências
-      run: pip install pyyaml==6.0.2
+      run: pip install -r .github/requirements-ci.txt
 
     # CLI nova (binario Go), nao o pacote pip `databricks-cli`, que esta
     # deprecado e so le DATABRICKS_TOKEN. A tag pinada e a MESMA versao que
