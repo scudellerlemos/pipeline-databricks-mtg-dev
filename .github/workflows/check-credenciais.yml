@@ -60,8 +60,8 @@ jobs:
           sys.exit(1 if problemas else 0)
           PY
 
-      # PAT do GitHub que dispara o repo de controle. Expirou = tag promovida
-      # nao chega em producao, e o push da tag fica verde do mesmo jeito.
+      # PAT do GitHub que o promote.yml usa pra publicar no repo de prd e
+      # disparar o deploy de la. Expirou = o promote falha e nada chega em prd.
       - name: PAT de dispatch do GitHub
         env:
           TOKEN: ${{ secrets.PRD_DISPATCH_TOKEN }}
