@@ -43,10 +43,30 @@ Os cinco notebooks usam exclusivamente a
   temporal: cortar por data quebraria a rastreabilidade de IDs antigos que
   Bronze/Silver podem precisar resolver, mesmo tratando de cartas antigas.
 
-A Scryfall não expõe CDC nem um cursor de "o que mudou desde X" para cards/sets — só
-`released_at`/`digital` nos sets. Por isso **não existe incrementalidade "de verdade"**
-além do filtro temporal por `years_back`: cada run relê o catálogo inteiro da Scryfall
-e decide o que gravar via idempotência de arquivo (abaixo), não via delta da API.
+**Todas as tabelas são snapshot**: cada run relê o catálogo inteiro da Scryfall
+(recortado por `years_back` onde se aplica) e decide o que gravar via idempotência
+de arquivo (abaixo), não via delta da API. O que a API oferece (conferido em 09/2026):
+
+- **cards/card_prices**: sem campo de "atualizado em" (só `released_at` e
+  `image_updated_at`). Dá pra buscar impressões novas por data de lançamento, mas
+  legalidade, errata e preço mudam em carta antiga sem carimbo - incremental perderia isso.
+- **sets**: sem campo de atualização; 1 request, não precisa.
+- **rulings**: tem `published_at`, mas o bulk é um arquivo único (~5MB) e ruling
+  editada/removida não seria vista.
+- **migrations**: o único que permite incremental - a paginação vem ordenada por
+  `performed_at` decrescente, daria pra parar no último carregado. Ficou snapshot
+  mesmo assim: são poucas páginas por mês, e um watermark traria estado a manter e um
+  reprocesso diferente do resto da camada.
+
+Os bulks são regenerados diariamente pela Scryfall: a frequência mensal é escolha
+do pipeline, não limite da fonte.
+
+**Escopo fechado (decisão de produto, 09/2026):**
+
+- **Frequência mensal**, inclusive para preço - 1 ponto por impressão por mês.
+- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção. Fica de fora
+  ~43% das cartas (as sem impressão na janela) e as impressões antigas das cartas que
+  estão dentro - de propósito.
 
 ## Notebooks
 

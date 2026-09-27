@@ -1,7 +1,7 @@
 # Databricks notebook source
 # Ingestão de Cards - Magic: The Gathering (Bulk Data)
 # Objetivo: Ingerir dados de cards via Scryfall Bulk Data API para staging em Parquet no S3
-# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, incremental, por coleção (set)
+# Características: Dados brutos, formato Parquet, filtro temporal, particionamento, snapshot, por coleção (set)
 
 # =============================================================================
 # BIBLIOTECAS UTILIZADAS
