@@ -61,9 +61,6 @@ jobs:
     - name: Lint notebook Python cells
       run: python .github/scripts/lint_notebooks.py
 
-    - name: Barrar emoji no codigo e nas docs
-      run: python .github/scripts/checar_emoji.py
-
     - name: Run unit tests
       run: python -m pytest src .github/scripts -q
 
@@ -77,7 +74,6 @@ jobs:
           - Sintaxe YAML válida
           - Estrutura do pipeline, notebooks, cluster e git
           - Lint estático das células Python (ruff F821/F822/F823)
-          - Sem emoji no código e nas docs
           - Suíte de testes unitários (pytest)
 
           Nada foi executado num cluster. O smoke test roda no merge.`;

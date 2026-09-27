@@ -96,7 +96,6 @@ pipeline-databricks-mtg-dev/
 │   │   ├── deploy.py              # Deploy dos jobs (dev ou prd, por env var)
 │   │   ├── smoke.py               # Smoke test pós-deploy
 │   │   ├── validate_dag.py        # Validação da DAG e dos notebooks
-│   │   ├── checar_emoji.py        # Barra emoji no código e nas docs
 │   │   └── lint_notebooks.py      # Lint das células Python
 │   ├── requirements-ci.txt        # Dependências do CI e do deploy de prd
 │   └── DAGs/
@@ -160,7 +159,6 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 - **Sintaxe**: YAMLs das DAGs
 - **Estrutura**: DAG, notebooks, cluster e git (`validate_dag.py`)
 - **Lint**: células Python dos notebooks (`lint_notebooks.py`)
-- **Emoji**: nenhum emoji em arquivo versionado (`checar_emoji.py`)
 - **Testes**: `pytest`
 - **Comentário no PR**: confirmação quando todas as validações passam (falha aparece só no check `validate`)
 

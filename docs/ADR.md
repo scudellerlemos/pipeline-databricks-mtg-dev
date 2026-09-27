@@ -209,8 +209,7 @@ permissão *Workflows* além de *Contents*.
 **Decisão.**
 - **CI** (`validate-pipeline.yml`, todo PR e push de código na `main`): sintaxe dos YAMLs,
   estrutura da DAG e config de cluster (`validate_dag.py`), lint das células
-  Python dos notebooks (`lint_notebooks.py`), emoji em arquivo versionado
-  (`checar_emoji.py`) e `pytest`.
+  Python dos notebooks (`lint_notebooks.py`) e `pytest`.
 - **Smoke test** (`smoke.py`, depois de todo deploy, dev e prd): `jobs submit`
   de um notebook que grava e lê no catálogo do ambiente, com a mesma config do
   job recém-deployado.
