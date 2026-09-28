@@ -2,7 +2,7 @@
 
 ## 1. Nome da Tabela e Camada
 - **Tabela:** TB_FATO_MERCADO_CARTAS
-- **Camada:** Gold (view sobre `silver.TB_FATO_PRECOS_CARTAS` x `gold.TB_DIM_CARTAS`)
+- **Camada:** Gold (`silver.TB_FATO_PRECOS_CARTAS` x `gold.TB_DIM_CARTAS`)
 
 ## 2. Descrição Completa
 Visão única de mercado de cartas de Magic: The Gathering - combina catálogo de carta, coleção de origem, histórico de cotação de preço e volume de esclarecimentos oficiais de regras. Uma linha por cotação de preço de uma impressão de carta. Feita para consumo direto por analista/BI/Genie, sem precisar conhecer Bronze/Silver.
@@ -12,7 +12,7 @@ Visão única de mercado de cartas de Magic: The Gathering - combina catálogo d
 
 ## 4. Grão e Chave Única
 - **Grão:** 1 linha por cotação de preço de uma impressão de carta.
-- **Chave:** `(ID_CARTA, DT_COTACAO)`, única por construção: PK `(ID_CARTA, DT_INGESTAO)` da Silver de preços x PK `ID_CARTA` de `TB_DIM_CARTAS` (view não tem PK declarada).
+- **Chave:** `(ID_CARTA, DT_COTACAO)`, declarada como PRIMARY KEY.
 
 ## 5. Regras de Nulo
 - `NME_COLECAO`/`NME_BLOCO` NULOS -> `Nao_Identificado` (coleção sem match no LEFT JOIN; em `NME_BLOCO` também quando a coleção não pertence a nenhum bloco). Os demais categóricos vêm da Silver como estão.
@@ -23,14 +23,14 @@ Visão única de mercado de cartas de Magic: The Gathering - combina catálogo d
 - `ID_CARTA_CANONICO` nunca é NULO - cai no próprio `ID_CARTA` quando não há migração.
 
 ## 6. Carga
-`TB_DIM_CARTAS` é recalculada inteira da Silver e gravada com `overwrite` a cada execução (chave duplicada no lote aborta antes de gravar); a view é recriada (`CREATE OR REPLACE VIEW`) com o mesmo contrato de schema. O histórico de preço não é copiado: vem da Silver, que é incremental. `ANO_COTACAO`/`MES_COTACAO` são as colunas de partição da Silver, então filtrar por elas poda partição.
+`TB_DIM_CARTAS` e esta tabela são recalculadas inteiras da Silver e gravadas com `overwrite` a cada execução (chave duplicada no lote aborta antes de gravar). Sem MERGE: o que sai da Silver sai da Gold, e atributo novo da carta (migração, ruling) vale para cotações antigas. Particionada por `ANO_COTACAO`/`MES_COTACAO`.
 
 ## 7. Data Quality e Auditoria
-Abortam a run: PK de `TB_DIM_CARTAS` com chave NULA ou duplicada (no lote, antes de gravar; ou já gravada na tabela), `ID_ORACLE` nulo, valor negativo de preço e nulo residual em coluna categórica (limite 0); no pré-join, preços sem carta acima de 12000. Só informativos: coleção não encontrada, cartas sem cotação e ids migrados. 1 linha de auditoria em `TB_AUDITORIA_GOLD` (run id, início/fim, duração, contagens, resultado de DQ, status) por execução, inclusive as abortadas (gravada num `finally`): `SUCESSO`, `FALHA_DQ` (DQ pré-join ou pós-carga), `FALHA_DQ_PK` (validação de PK) ou `FALHA` (erro inesperado).
+Abortam a run: PK (desta tabela ou de `TB_DIM_CARTAS`) com chave NULA ou duplicada (no lote, antes de gravar; ou já gravada na tabela), `ID_ORACLE` nulo, valor negativo de preço e nulo residual em coluna categórica (limite 0); no pré-join, preços sem carta acima de 12000. Só informativos: coleção não encontrada, cartas sem cotação e ids migrados. 1 linha de auditoria em `TB_AUDITORIA_GOLD` (run id, início/fim, duração, contagens, resultado de DQ, status) por execução, inclusive as abortadas (gravada num `finally`): `SUCESSO`, `FALHA_DQ` (DQ pré-join ou pós-carga), `FALHA_DQ_PK` (validação de PK) ou `FALHA` (erro inesperado).
 
 ## 8. Histórico de Alterações
 | Data | Responsável | Alteração |
 |---|---|---|
 | 2026-09-15 | Felipe | Criação - substitui as 3 tabelas Gold antigas (schema pré-DAMA, colunas em inglês) por uma única tabela Gold sobre o schema Silver atual |
 | 2026-09-15 | Felipe | Adiciona `TB_MOV_MIGRACOES_CARTAS` (LEFT JOIN agregado) e as colunas `ID_CARTA_CANONICO`/`FLG_ID_CARTA_MIGRADO`, pra resolver id de carta migrado/descontinuado direto na Gold |
-| 2026-09-27 | Felipe | Vira view sobre `TB_DIM_CARTAS` + preços da Silver (ADR-013): custo constante por run e sem linha órfã |
+| 2026-09-27 | Felipe | Passa a ser montada a partir de `TB_DIM_CARTAS` e gravada com overwrite em vez de MERGE (ADR-013): sem linha órfã |

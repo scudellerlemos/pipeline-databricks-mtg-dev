@@ -1,10 +1,10 @@
 # Camada Gold
 
-`TB_FATO_MERCADO_CARTAS` - visão de mercado de cartas de Magic: The Gathering pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver. É uma view: preços da Silver x `TB_DIM_CARTAS` (atributos atuais da carta, única tabela gravada na Gold). Ver [ADR-013](../../docs/ADR.md#adr-013--gold-como-dimensão--view).
+`TB_FATO_MERCADO_CARTAS` - visão de mercado de cartas de Magic: The Gathering pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver. Tabela: preços da Silver x `TB_DIM_CARTAS` (atributos atuais da carta). As duas são recalculadas e gravadas com overwrite a cada run. Ver [ADR-013](../../docs/ADR.md#adr-013--gold-recalculada-com-overwrite).
 
 - **Script:** `Dev/TB_FATO_MERCADO_CARTAS.py`
 - **Utilitários:** `Dev/gold_utils.py` (config/extract/load/auditoria, mesmo padrão de `silver_utils.py`)
-- **Comentários de negócio:** `Dev/gold_column_docs.py` (fonte única; na tabela via `COMMENT ON TABLE`/`ALTER COLUMN...COMMENT`, na view no próprio `CREATE VIEW`)
+- **Comentários de negócio:** `Dev/gold_column_docs.py` (fonte única, aplicada via `COMMENT ON TABLE`/`ALTER COLUMN...COMMENT`)
 - **Documentação:** [`Documentação/TB_FATO_MERCADO_CARTAS/Readme.md`](./Documentação/TB_FATO_MERCADO_CARTAS/Readme.md)
 
 ## Modelagem (Silver -> Gold)
@@ -22,8 +22,8 @@ graph TD
     end
 
     subgraph GOLD["Camada Gold"]
-        GOLD_DIM["TB_DIM_CARTAS (tabela)<br/>PK: ID_CARTA"]
-        GOLD_MERCADO["TB_FATO_MERCADO_CARTAS (view)<br/>chave: ID_CARTA + DT_COTACAO"]
+        GOLD_DIM["TB_DIM_CARTAS<br/>PK: ID_CARTA"]
+        GOLD_MERCADO["TB_FATO_MERCADO_CARTAS<br/>PK: ID_CARTA + DT_COTACAO"]
     end
 
     FATO_CARTAS -->|"driver"| GOLD_DIM

@@ -23,7 +23,7 @@ isso está dito em cada uma.
 | [010](#adr-010--validação-em-camadas-ci-estático--smoke-test) | Validação em camadas: CI estático + smoke test | Aceita |
 | [011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd) | Publicação com código novo roda o pipeline de prd | Aceita |
 | [012](#adr-012--símbolos-de-mana-fora-do-pipeline) | Símbolos de mana fora do pipeline | Aceita |
-| [013](#adr-013--gold-como-dimensão--view) | Gold como dimensão + view | Aceita |
+| [013](#adr-013--gold-recalculada-com-overwrite) | Gold recalculada com overwrite | Aceita |
 
 ---
 
@@ -85,9 +85,8 @@ por curiosidade — sem duplicar dado.
   coluna de ordenação, senão `dropDuplicates`) e grava com merge do Delta
   (`DeltaTable.merge`) por essa chave. Na primeira carga, sem tabela ainda, é
   `overwrite`.
-- **Gold** grava com `overwrite` só a dimensão, recalculada inteira; chave
-  duplicada no lote aborta a run. O histórico chega por view
-  ([ADR-013](#adr-013--gold-como-dimensão--view)).
+- **Gold** é recalculada inteira da Silver e gravada com `overwrite`; chave
+  duplicada no lote aborta a run ([ADR-013](#adr-013--gold-recalculada-com-overwrite)).
 - Toda camada valida o schema antes de gravar: a Stage aborta se coluna
   obrigatória vier nula (`colunas_obrigatorias` no `salvar_em_parquet`); Bronze,
   Silver e Gold comparam o lote com a tabela e com o `*_column_docs`
@@ -261,27 +260,24 @@ testes e docs). As tabelas e os arquivos no S3 são apagados à mão, fora do de
 mana volta com revert deste commit quando tiver consumidor — de preferência já
 agregada por carta, sem mudar o grão da Gold.
 
-## ADR-013 — Gold como dimensão + view
+## ADR-013 — Gold recalculada com overwrite
 
-**Contexto.** `TB_FATO_MERCADO_CARTAS` era uma tabela larga (cotação x atributos
-da carta) recalculada inteira e gravada com MERGE a cada run. Duas coisas
-pesavam: o custo crescia com o histórico (~60 mil cotações por mês, janela de 5
-anos) e o MERGE nunca apagava, então o que saía da Silver ficava na Gold (a Gold
-chegou a ter 3 snapshots com a Silver em 2). Incremental puro na tabela larga
-não serve: migração de id e ruling novo precisam valer para cotações antigas.
+**Contexto.** `TB_FATO_MERCADO_CARTAS` (cotação x atributos da carta) era
+recalculada inteira e gravada com MERGE a cada run. O MERGE nunca apagava: o
+que saía da Silver ficava na Gold (a Gold chegou a ter 3 snapshots com a
+Silver em 2). Incremental puro não serve: migração de id e ruling novo
+precisam valer para cotações antigas. View resolveria o custo, mas a Gold
+precisa ser tabela física para consumo (BI/Genie).
 
 **Decisão.**
 - `gold.TB_DIM_CARTAS`: 1 linha por `ID_CARTA` com os atributos atuais
-  (catálogo, coleção, rulings, migração), gravada com `overwrite` a cada run.
-- `gold.TB_FATO_MERCADO_CARTAS` vira view: `silver.TB_FATO_PRECOS_CARTAS` INNER
-  JOIN `TB_DIM_CARTAS`. Mesmo nome e colunas; o histórico de preço não é
-  copiado, a Silver já grava incremental.
-- Na primeira run, a tabela EXTERNAL antiga sai do catálogo com `DROP TABLE`
-  (os arquivos ficam no S3 e são apagados à mão).
+  (catálogo, coleção, rulings, migração), PK `ID_CARTA`.
+- `gold.TB_FATO_MERCADO_CARTAS`: `silver.TB_FATO_PRECOS_CARTAS` INNER JOIN
+  `TB_DIM_CARTAS`, PK `(ID_CARTA, DT_COTACAO)`.
+- As duas são recalculadas inteiras e gravadas com `overwrite`, sem MERGE.
 
-**Consequências.** O job da Gold tem custo constante (tamanho do catálogo, não
-do histórico) e a Gold sempre reflete a Silver. O join passa a rodar a cada
-consulta, e PK só é declarada nas tabelas: `TB_DIM_CARTAS (ID_CARTA)` e, na
-Silver, `TB_FATO_PRECOS_CARTAS (ID_CARTA, DT_INGESTAO)`. Se consulta na view
-pesar, a saída é materializar (`CREATE OR REPLACE TABLE AS SELECT`), não voltar
+**Consequências.** A Gold sempre reflete a Silver e o histórico recebe os
+atributos atuais. O custo do job cresce com o histórico (~60 mil cotações por
+mês; ~3,6 mi linhas na janela de 5 anos, ainda poucos minutos). Se pesar, a
+saída é separar a fato de preço (append incremental) da dimensão, não voltar
 ao MERGE.

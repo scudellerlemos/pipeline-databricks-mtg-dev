@@ -101,7 +101,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - Transformações em SQL puro, sem UDFs Python
 
 **Tabelas**:
-- **TB_FATO_MERCADO_CARTAS** - Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras + migrações de ID). View sobre `TB_DIM_CARTAS` + preços da Silver
+- **TB_FATO_MERCADO_CARTAS** - Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras + migrações de ID). Preços da Silver x `TB_DIM_CARTAS`
 
 ## Fluxo de Dados Completo
 
@@ -146,9 +146,9 @@ salvar_na_silver(df_silver, catalogo, "silver", "TB_FATO_CARTAS", caminho_s3_sil
 ```python
 # Extração das tabelas Silver e junção via SQL (spark.sql() sobre temp views)
 df_dim = spark.sql("SELECT ... FROM _cartas LEFT JOIN _colecoes ...")  # ver Dev/TB_FATO_MERCADO_CARTAS.py
-# Data quality + overwrite da dimensão + view sobre os preços da Silver + auditoria em TB_AUDITORIA_GOLD
+# Data quality + overwrite da dimensão e da fato + auditoria em TB_AUDITORIA_GOLD
 salvar_na_gold(df_dim, catalogo, "gold", "TB_DIM_CARTAS", caminho_s3_gold, coluna_chave="ID_CARTA", ...)
-criar_view_gold(f"{catalogo}.gold.TB_FATO_MERCADO_CARTAS", consulta_view_mercado(catalogo), ...)
+salvar_na_gold(spark.sql(consulta_fato_mercado(catalogo)), catalogo, "gold", "TB_FATO_MERCADO_CARTAS", caminho_s3_gold, ...)
 ```
 
 ## Tecnologias Utilizadas

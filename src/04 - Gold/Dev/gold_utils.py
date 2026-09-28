@@ -22,7 +22,6 @@ processador = GoldTableProcessor("TB_DIM_CARTAS", config)
 df_cartas = processador.extrair_da_silver("TB_FATO_CARTAS")
 df_dim = processador.transformar_dados(df_cartas, funcao_transformacao)
 processador.salvar_tabela_gold(df_dim, coluna_chave="ID_CARTA")
-criar_view_gold("catalog.gold.TB_FATO_MERCADO_CARTAS", "SELECT ...", comentario, comentarios_colunas)
 """
 
 import uuid
@@ -144,10 +143,9 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
     """
     LOAD: grava df_final na camada Gold (Delta + Unity Catalog) com overwrite.
 
-    A Gold só grava o que é recalculado inteiro a cada run (dimensão); o
-    histórico de preço fica na Silver e chega à Gold por view (criar_view_gold).
-    Overwrite em vez de MERGE: o que sai da Silver sai da Gold. Lote com chave
-    duplicada aborta antes de gravar.
+    Toda tabela Gold é recalculada inteira da Silver a cada run. Overwrite em
+    vez de MERGE: o que sai da Silver sai da Gold. Lote com chave duplicada
+    aborta antes de gravar.
 
     Args:
         df_final (DataFrame): DataFrame final para salvar
@@ -193,8 +191,9 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         permitir_quebra=permitir_quebra_esquema,
     )
 
-    # overwriteSchema: coluna nova já passou pelo contrato acima.
-    escritor = df_final.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+    # mergeSchema: coluna nova (já validada pelo contrato) entra; NOT NULL e PK
+    # da tabela ficam. overwriteSchema trocaria o schema e derrubaria o NOT NULL.
+    escritor = df_final.write.format("delta").mode("overwrite").option("mergeSchema", "true")
     if colunas_particao:
         escritor = escritor.partitionBy(*colunas_particao)
     escritor.save(caminho_delta)
@@ -214,41 +213,6 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, colunas_chave)
 
     print("Dados salvos com sucesso na camada Gold!")
-
-
-def criar_view_gold(nome_completo_view, consulta_sql, comentario_view, comentarios_colunas,
-                    permitir_quebra_esquema=False):
-    """
-    CREATE OR REPLACE VIEW com os comentários no próprio DDL (view não aceita
-    ALTER COLUMN COMMENT). Mesmo contrato de schema das tabelas: coluna
-    removida ou com tipo alterado aborta antes de trocar a view.
-
-    Se o nome ainda for uma tabela (a Gold era EXTERNAL antes de virar view),
-    faz DROP TABLE: só tira do catálogo, os arquivos continuam no S3.
-    """
-    sessao_spark = obter_sessao_spark()
-    esquema_novo = sessao_spark.sql(consulta_sql).schema
-
-    existe = sessao_spark.catalog.tableExists(nome_completo_view)
-    campos_atuais = campos_do_esquema(sessao_spark.table(nome_completo_view).schema) if existe else {}
-    validar_contrato_esquema(
-        nome_completo_view, campos_atuais, campos_do_esquema(esquema_novo),
-        colunas_documentadas=list(comentarios_colunas),
-        permitir_quebra=permitir_quebra_esquema,
-    )
-
-    if existe and sessao_spark.catalog.getTable(nome_completo_view).tableType != "VIEW":
-        print(f"{nome_completo_view} ainda é tabela: DROP TABLE (arquivos ficam no S3) para virar view.")
-        sessao_spark.sql(f"DROP TABLE {nome_completo_view}")
-
-    colunas = ",\n  ".join(
-        f"`{c}` COMMENT '{_escapar_string_sql(comentarios_colunas[c])}'" for c in esquema_novo.names
-    )
-    sessao_spark.sql(
-        f"CREATE OR REPLACE VIEW {nome_completo_view} (\n  {colunas}\n)\n"
-        f"COMMENT '{_escapar_string_sql(comentario_view)}'\nAS\n{consulta_sql}"
-    )
-    print(f"View {nome_completo_view} criada/atualizada.")
 
 
 # ============================================================================
