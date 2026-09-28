@@ -9,7 +9,7 @@
 
 ## Modelagem (Silver -> Gold)
 
-`TB_FATO_MERCADO_CARTAS` usa as 5 tabelas Silver.
+`TB_FATO_MERCADO_CARTAS` usa as 5 tabelas Silver, via `TB_DIM_CARTAS`. A dimensão é regravada inteira (overwrite); a fato recebe MERGE só com as cotações novas e com o histórico das cartas que mudaram na dimensão. Carga completa na primeira run, se a dimensão mudar de colunas ou com `rebuild=true`.
 
 ```mermaid
 graph TD
@@ -22,16 +22,16 @@ graph TD
     end
 
     subgraph GOLD["Camada Gold"]
-        GOLD_DIM["TB_DIM_CARTAS<br/>PK: ID_CARTA"]
-        GOLD_MERCADO["TB_FATO_MERCADO_CARTAS<br/>PK: ID_CARTA + DT_COTACAO"]
+        GOLD_DIM["TB_DIM_CARTAS<br/>PK: ID_CARTA<br/>overwrite"]
+        GOLD_MERCADO["TB_FATO_MERCADO_CARTAS<br/>PK: ID_CARTA + DT_COTACAO<br/>MERGE incremental"]
     end
 
     FATO_CARTAS -->|"driver"| GOLD_DIM
     DIM_COLECOES -->|"COD_COLECAO"| GOLD_DIM
     FATO_ESCLARECIMENTOS -->|"ID_ORACLE, qtd esclarecimentos"| GOLD_DIM
     MOV_MIGRACOES -->|"ID_CARTA_ANTIGO, resolve ID_CARTA_CANONICO"| GOLD_DIM
-    GOLD_DIM -->|"ID_CARTA"| GOLD_MERCADO
-    FATO_PRECOS -->|"ID_CARTA, toda cotacao (INNER)"| GOLD_MERCADO
+    GOLD_DIM -->|"ID_CARTA; cartas que mudaram reprocessam todo o histórico"| GOLD_MERCADO
+    FATO_PRECOS -->|"ID_CARTA (INNER); só DT_INGESTAO > última DT_COTACAO"| GOLD_MERCADO
 
     classDef used fill:#2f6f4f,stroke:#1b4332,color:#ffffff,stroke-width:2px;
     classDef gold fill:#b8860b,stroke:#7a5c00,color:#ffffff,stroke-width:2px;
