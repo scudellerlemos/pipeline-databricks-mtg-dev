@@ -1,6 +1,6 @@
 resources:
   jobs:
-    # Roda depois da Silver inteira; a ordem fica com o orquestrador (MTG_PIPELINE).
+    # Roda depois da Silver inteira; a ordem fica no MTG_PIPELINE.
     MTG_GOLD:
       name: MTG_GOLD
       description: "Camada Gold do pipeline de Magic: The Gathering"
