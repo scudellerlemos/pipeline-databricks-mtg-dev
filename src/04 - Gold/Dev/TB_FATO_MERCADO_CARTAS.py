@@ -20,7 +20,7 @@ continua a antiga e a próxima run acha as mesmas cartas mudadas. Sem time
 travel de propósito: o log Delta guarda 30 dias e a run é mensal.
 
 Carga completa (overwrite das duas) quando: fato ou dimensão ainda não
-existem, a dimensão mudou de colunas, ou widget rebuild=true. O incremental
+existem, a fato está vazia, a dimensão mudou de colunas, ou widget rebuild=true. O incremental
 não apaga: cotação removida da Silver (correção manual) só sai da Gold com
 rebuild=true.
 
@@ -106,7 +106,7 @@ def transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos
 
     # DATA QUALITY (pré-join): conta o que o INNER JOIN da fato descarta, antes de gravar nada.
     executar_checagens_dq(spark, "pré-join", {
-        # Carta sem cotação. Sempre > 0: carta nova chega antes do preço dela.
+        # Carta sem cotação. Sempre > 0: cards filtra a janela pela data da coleção e card_prices pela da impressão.
         "cartas_excluidas_sem_cotacao_de_preco": ("""
             SELECT COUNT(DISTINCT c.ID_CARTA)
             FROM _cartas c

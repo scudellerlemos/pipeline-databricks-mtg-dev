@@ -286,7 +286,7 @@ precisa ser tabela física para consumo (BI/Genie).
   segue a antiga e a próxima run acha as mesmas cartas mudadas. Sem time
   travel: o log Delta guarda 30 dias e a run é mensal (28-35 dias).
 - Carga completa (`overwrite`) quando a fato ou a dimensão não existem, a
-  dimensão mudou de colunas, ou com o widget `rebuild=true`.
+  fato está vazia, a dimensão mudou de colunas, ou com o widget `rebuild=true`.
 
 **Consequências.** O custo da run segue o volume novo, não o histórico, e
 migração/ruling novo continuam valendo para cotações antigas. O incremental

@@ -139,7 +139,7 @@ pipeline-databricks-mtg-dev/
 - **Função**: Visão de mercado pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver
 - **Dados**: 2 tabelas (`TB_FATO_MERCADO_CARTAS` e a dimensão `TB_DIM_CARTAS` que a alimenta) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; usa as 5 tabelas Silver
 - **Grão**: 1 linha por cotação de preço de uma impressão de carta — chave `(ID_CARTA, DT_COTACAO)`
-- **Carga**: dimensão com `overwrite`; fato com MERGE incremental (cotações novas + histórico das cartas que mudaram na dimensão), particionada por ano/mês de cotação; carga completa na 1ª vez ou com `rebuild=true` — ver [ADR-013](docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)
+- **Carga**: dimensão com `overwrite`; fato com MERGE incremental (cotações novas + histórico das cartas que mudaram na dimensão), particionada por ano/mês de cotação; carga completa na 1ª vez, quando a dimensão muda de colunas ou com `rebuild=true` — ver [ADR-013](docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)
 - **Qualidade**: Checagens de PK/FK, valor negativo de preço e nulo residual, auditadas por run em `TB_AUDITORIA_GOLD`
 - **Documentação de negócio**: [`src/04 - Gold/Documentação/`](<src/04 - Gold/Documentação/Readme.md>)
 
