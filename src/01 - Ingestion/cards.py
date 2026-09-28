@@ -224,7 +224,7 @@ if df_cartas is not None:
     print("Arquivos salvos com sucesso")
     print(f"Total de registros: {df_cartas.count()}")
     print(f"Coleções processadas: {len(codigos_colecoes)} (últimos {ANOS_RETROATIVOS} anos)")
-    print("Particionamento: por ingestion_timestamp (ano/mês/dia da execução)")
+    print("Particionamento: por ingestion_timestamp (ano/mês da execução; dia só no nome do arquivo)")
 else:
     print("Falha na ingestão de cards")
 

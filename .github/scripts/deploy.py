@@ -2,7 +2,7 @@
 """
 Deploy dos jobs do pipeline no Databricks.
 
-O orquestrador (MTG_PIPELINE) declara as camadas como run_job_task com
+O MTG_PIPELINE declara as camadas como run_job_task com
 placeholder "{{MTG_STAGE_JOB_ID}}" etc. O deploy troca cada uma pelas tasks do
 YAML da camada, todas num cluster so (ver embutir_camadas). Os jobs de camada
 seguem deployados para rodar uma camada avulsa.
@@ -96,8 +96,7 @@ def aplicar_alvo(config_job):
     if ALVO["status_pausa"] and "schedule" in config_job:
         config_job["schedule"]["pause_status"] = ALVO["status_pausa"]
 
-    # Vai em todos os jobs, inclusive o orquestrador: uma falha de camada gera
-    # 2 emails (camada + orquestrador). Se incomodar, filtrar por "schedule" in config_job.
+    # Vai em todos os jobs: o MTG_PIPELINE e os jobs de camada (run avulsa).
     if ALVO["email_alerta"]:
         config_job["email_notifications"] = {
             "on_failure": [ALVO["email_alerta"]],
@@ -131,21 +130,21 @@ def embutir_camadas(config_job):
     Com run_job_task cada camada subia o proprio cluster (~115s de setup cada,
     medido em 28/09); embutidas, o pipeline inteiro divide um. As tasks sem
     depends_on dentro da camada passam a depender de todas as tasks da camada
-    anterior, e herdam os campos da task do orquestrador (ex.: retry da Stage).
+    anterior, e herdam os campos da task-marcador (ex.: retry da Stage).
     """
     arquivos = {chave: caminho for caminho, chave in ORDEM_DEPLOY}
     tarefas, clusters, git, tarefas_por_camada = [], {}, None, {}
-    for orquestradora in config_job["tasks"]:
-        chave = orquestradora["run_job_task"]["job_id"].strip("{}").removesuffix("_JOB_ID")
+    for marcador in config_job["tasks"]:
+        chave = marcador["run_job_task"]["job_id"].strip("{}").removesuffix("_JOB_ID")
         camada = carregar_yaml_job(arquivos[chave], chave)
-        anteriores = [k for dep in orquestradora.get("depends_on", []) for k in tarefas_por_camada[dep["task_key"]]]
-        herdado = {k: v for k, v in orquestradora.items() if k not in ("task_key", "depends_on", "run_job_task")}
+        anteriores = [k for dep in marcador.get("depends_on", []) for k in tarefas_por_camada[dep["task_key"]]]
+        herdado = {k: v for k, v in marcador.items() if k not in ("task_key", "depends_on", "run_job_task")}
         for tarefa in camada["tasks"]:
             tarefa = {**tarefa, **herdado}
             if "depends_on" not in tarefa and anteriores:
                 tarefa["depends_on"] = [{"task_key": k} for k in anteriores]
             tarefas.append(tarefa)
-        tarefas_por_camada[orquestradora["task_key"]] = [t["task_key"] for t in camada["tasks"]]
+        tarefas_por_camada[marcador["task_key"]] = [t["task_key"] for t in camada["tasks"]]
 
         for cluster in camada.get("job_clusters", []):
             if clusters.setdefault(cluster["job_cluster_key"], cluster) != cluster:
@@ -159,7 +158,7 @@ def embutir_camadas(config_job):
 
 
 def carregar_config_job(caminho_yaml, chave_job):
-    """Le o YAML, extrai o job, embute as camadas (orquestrador) e aplica o alvo."""
+    """Le o YAML, extrai o job, embute as camadas (MTG_PIPELINE) e aplica o alvo."""
     config_job = carregar_yaml_job(caminho_yaml, chave_job)
     if any("run_job_task" in t for t in config_job.get("tasks", [])):
         config_job = embutir_camadas(config_job)

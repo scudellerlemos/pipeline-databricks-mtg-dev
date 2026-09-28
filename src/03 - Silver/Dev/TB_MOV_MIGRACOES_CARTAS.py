@@ -179,7 +179,9 @@ configurar_unity_catalog(config['catalog_name'], config['schema_silver'])
 # =============================================================================
 processador = SilverTableProcessor("TB_MOV_MIGRACOES_CARTAS", config)
 
-df_bronze = processador.extrair_da_bronze("migrations")
+# Bronze inteira, não incremental: a cadeia A->B->C precisa das migrações de
+# runs anteriores e as linhas já gravadas precisam do canônico novo (tabela pequena).
+df_bronze = extrair_da_bronze(config['catalog_name'], "migrations")
 
 df_silver_parcial = processador.transformar_dados(df_bronze, transformar_migracoes_silver)
 df_silver = anexar_id_canonico(df_silver_parcial)

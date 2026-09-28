@@ -1,12 +1,12 @@
 resources:
   jobs:
-    # Orquestrador: Stage -> Bronze -> Silver -> Gold, cada camada so depois da
+    # Pipeline inteiro num job (sem orquestrador): Stage -> Bronze -> Silver -> Gold, cada camada so depois da
     # anterior terminar. Cada run_job_task e so um marcador: o deploy troca pelas
     # tasks do YAML da camada, todas num cluster so (deploy.embutir_camadas).
     # Com run_job_task de verdade cada camada subia o proprio cluster (~115s cada).
     MTG_PIPELINE:
       name: MTG_PIPELINE
-      description: "Orquestrador: Stage -> Bronze -> Silver -> Gold"
+      description: "Pipeline completo: Stage -> Bronze -> Silver -> Gold"
       # Run normal leva ~20min; 4h indica travamento. Sem timeout o run fica
       # RUNNING indefinidamente e o alerta on_failure nunca dispara.
       timeout_seconds: 14400
@@ -19,7 +19,7 @@ resources:
         pause_status: PAUSED
       tasks:
         - task_key: rodar_stage
-          # Unica task com retry: depende do Scryfall, onde erro transitorio (503)
+          # Retry so na Stage (vale pra todas as tasks dela ao embutir): depende do Scryfall, onde erro transitorio (503)
           # e comum. Nas outras camadas erro e bug ou DQ, retry nao ajuda.
           max_retries: 2
           min_retry_interval_millis: 300000
@@ -49,4 +49,4 @@ resources:
         environment: "development"
         team: "data-engineering"
         api_source: "scryfall"
-        layer: "orquestrador"
+        layer: "pipeline"

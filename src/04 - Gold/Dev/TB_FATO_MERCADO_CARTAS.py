@@ -20,7 +20,7 @@ continua a antiga e a próxima run acha as mesmas cartas mudadas. Sem time
 travel de propósito: o log Delta guarda 30 dias e a run é mensal.
 
 Carga completa (overwrite das duas) quando: fato ou dimensão ainda não
-existem, a dimensão mudou de colunas, ou widget rebuild=true. O incremental
+existem, a fato está vazia, a dimensão mudou de colunas, ou widget rebuild=true. O incremental
 não apaga: cotação removida da Silver (correção manual) só sai da Gold com
 rebuild=true.
 
@@ -53,7 +53,8 @@ REGRA DE NULO:
 - Preços nulos continuam nulos (0 não significa "sem cotação").
 - QTD_ESCLARECIMENTOS nulo -> 0 (carta nunca teve ruling).
 - Datas nulas -> sentinela 1001-01-01.
-- PK nunca é mascarada: nulo faz a run falhar em _declarar_chave_primaria.
+- PK nunca é mascarada: nulo faz a run falhar em _declarar_chave_primaria
+  (carga completa) ou na constraint NOT NULL (MERGE).
 - ID_CARTA_CANONICO sem migração -> o próprio ID_CARTA.
 """
 
@@ -106,7 +107,7 @@ def transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos
 
     # DATA QUALITY (pré-join): conta o que o INNER JOIN da fato descarta, antes de gravar nada.
     executar_checagens_dq(spark, "pré-join", {
-        # Carta sem cotação. Sempre > 0: carta nova chega antes do preço dela.
+        # Carta sem cotação. Sempre > 0: cards filtra a janela pela data da coleção e card_prices pela da impressão.
         "cartas_excluidas_sem_cotacao_de_preco": ("""
             SELECT COUNT(DISTINCT c.ID_CARTA)
             FROM _cartas c
@@ -309,7 +310,7 @@ try:
         # ID_ORACLE vem da Silver sem COALESCE; nenhum nulo é tolerado.
         "fk_null_id_oracle": f"SELECT COUNT(*) FROM {nome_completo_tabela} WHERE ID_ORACLE IS NULL",
 
-        # Categóricos nunca são nulos (COALESCE aqui ou 'NA' na Silver).
+        # Categóricos nunca são nulos (COALESCE aqui, 'NA' na Silver ou colunas_obrigatorias da Stage).
         "null_residual_categorico": f"""SELECT COUNT(*) FROM {nome_completo_tabela}
             WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
                OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL

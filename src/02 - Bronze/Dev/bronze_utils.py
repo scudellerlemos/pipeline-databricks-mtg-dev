@@ -96,7 +96,7 @@ def obter_arquivos_ja_carregados(spark, caminho_delta):
 
 def validar_esquema_bronze(spark, caminho_delta, nome_completo_tabela, df_entrada,
                            comentarios_colunas=None, permitir_quebra_esquema=False):
-    """Coluna nova da Stage entra via mergeSchema; coluna removida ou com tipo
+    """Coluna nova da Stage (documentada no bronze_column_docs) entra via mergeSchema; coluna removida ou com tipo
     alterado aborta antes do append (senão viraria NULL nas linhas novas)."""
     try:
         campos_atuais = campos_do_esquema(spark.read.format("delta").load(caminho_delta).schema)
@@ -202,7 +202,8 @@ def executar_ingestao_bronze(spark, dbutils, catalogo, esquema,
     """EL completo: arquivos novos da Stage -> metadados técnicos -> contrato de
     schema -> append na Bronze -> tabela no Unity Catalog -> controle de execução.
 
-    Sem arquivo novo, não escreve nada e fecha como SUCCESS com 0 registros.
+    Sem arquivo novo, não grava dados (só atualiza comentários e grava o JSON
+    de controle) e fecha como SUCCESS com 0 registros.
     comentario_tabela/comentarios_colunas vêm de bronze_column_docs.py; as
     colunas documentadas são o contrato de nomes da tabela.
     permitir_quebra_esquema: True só para remover coluna ou mudar tipo de propósito.

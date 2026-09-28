@@ -4,7 +4,7 @@ resources:
       name: MTG_BRONZE
       description: "Camada Bronze - EL puro da Stage (S3/Parquet) para Delta"
       # Tasks independentes, rodam em paralelo. A ordem Stage -> Bronze fica
-      # com o orquestrador (MTG_PIPELINE).
+      # no MTG_PIPELINE (depends_on entre camadas).
       tasks:
         - task_key: bronze_cartas
           notebook_task:

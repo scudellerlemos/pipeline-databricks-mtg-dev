@@ -101,7 +101,7 @@ pipeline-databricks-mtg-dev/
 │   └── DAGs/
 │       ├── stage.yml              # Job MTG_STAGE
 │       ├── bronze.yml             # Job MTG_BRONZE
-│       ├── pipeline.yml           # Job MTG_PIPELINE (orquestrador)
+│       ├── pipeline.yml           # Job MTG_PIPELINE (pipeline inteiro num job)
 │       ├── silver.yml             # Job MTG_SILVER
 │       └── gold.yml               # Job MTG_GOLD
 │
@@ -115,9 +115,9 @@ pipeline-databricks-mtg-dev/
 ### 1. Ingestão (Stage)
 - **Fonte**: Scryfall API (bulk-data para cartas/preços, `/sets` para expansões)
 - **Dados**: Cartas, Sets, Preços de mercado (USD, EUR, TIX)
-- **Formato**: Parquet, em snapshots datados (`{ano}_{mes}_{dia}_{tabela}.parquet`)
-- **Estratégia de carga**: FULL LOAD por execução — a Scryfall não expõe incrementalidade real; o `{dia}` do nome do arquivo é sempre o dia da execução; em `sets` e `card_prices`, `{ano}_{mes}` vêm do `releaseDate`, com janela de anos — não há filtro incremental na origem
-- **Frequência**: Mensal (1ª segunda-feira do mês, 6h, `America/Sao_Paulo` — ver `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`); reexecução no mesmo dia pula arquivos já gravados com o mesmo nome
+- **Formato**: Parquet, em snapshots datados (`{ano}_{mes}_{AAAAMMDD}_{tabela}.parquet`)
+- **Estratégia de carga**: FULL LOAD por execução — a Scryfall não expõe incrementalidade real; o `{AAAAMMDD}` do nome do arquivo é sempre a data da execução; em `sets` e `card_prices`, `{ano}_{mes}` vêm do `releaseDate`, com janela de anos — não há filtro incremental na origem
+- **Frequência**: Mensal (1ª segunda-feira do mês, 6h, `America/Sao_Paulo` — ver `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`); reexecução no mesmo dia pula arquivos já gravados por completo (pasta com `_SUCCESS`) com o mesmo nome
 - **Controle de execução**: um JSON por run em `_control/{tabela}/{run_id}.json` (status, contagens, duração, erro)
 - **Resiliência**: retry com backoff em erros HTTP transitórios (429/5xx)
 
@@ -131,7 +131,7 @@ pipeline-databricks-mtg-dev/
 ### 3. Silver Layer
 - **Função**: Limpeza e padronização
 - **Nomenclatura de coluna**: 100% PT-BR, sem acento, 100% MAIÚSCULAS, com prefixo semântico padronizado (ID_, NME_, DESC_, COD_, DT_, ANO_, MES_, QTD_, VLR_, NUM_, FLG_, URL_) - sem uso de `( ) { }` no dado (sinalizaria transformação incompleta)
-- **Nomenclatura de tabela**: classificação DAMA-DMBOK (Fato/Dimensão) - ex.: `TB_FATO_CARTAS`, `TB_DIM_COLECOES`
+- **Nomenclatura de tabela**: classificação DAMA-DMBOK (Fato/Dimensão/Movimento) - ex.: `TB_FATO_CARTAS`, `TB_DIM_COLECOES`
 - **Chave única**: sinalizada na própria tabela via `COMMENT ON TABLE` e constraint `PRIMARY KEY` (a carga falha se a chave tiver NULO ou duplicata; o `SET NOT NULL` é aplicado automaticamente)
 - **Qualidade**: Validações e transformações
 
@@ -139,7 +139,7 @@ pipeline-databricks-mtg-dev/
 - **Função**: Visão de mercado pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver
 - **Dados**: 2 tabelas (`TB_FATO_MERCADO_CARTAS` e a dimensão `TB_DIM_CARTAS` que a alimenta) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; usa as 5 tabelas Silver
 - **Grão**: 1 linha por cotação de preço de uma impressão de carta — chave `(ID_CARTA, DT_COTACAO)`
-- **Carga**: Full extract da Silver a cada execução + merge Delta idempotente pela chave, particionada por ano/mês de cotação
+- **Carga**: dimensão com `overwrite`; fato com MERGE incremental (cotações novas + histórico das cartas que mudaram na dimensão), particionada por ano/mês de cotação; carga completa na 1ª vez, quando a dimensão muda de colunas ou com `rebuild=true` — ver [ADR-013](docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)
 - **Qualidade**: Checagens de PK/FK, valor negativo de preço e nulo residual, auditadas por run em `TB_AUDITORIA_GOLD`
 - **Documentação de negócio**: [`src/04 - Gold/Documentação/`](<src/04 - Gold/Documentação/Readme.md>)
 
@@ -163,16 +163,16 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 - **Comentário no PR**: confirmação quando todas as validações passam (falha aparece só no check `validate`)
 
 ### Deploy em Dev
-- **Trigger**: push na `main` que mexe em código (`src/`, `.github/{DAGs,workflows,scripts,prd}/`, `.github/requirements-ci.txt`) — merge só de docs não deploya
+- **Trigger**: push na `main` que mexe em código (`src/`, `.github/{DAGs,workflows,scripts,prd}/`, `.github/requirements-ci.txt`) — merge só de docs fora de `src/` não deploya
 - **Ambiente**: GitHub Environment `Databricks` (secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`)
-- **Ordem**: `MTG_STAGE` → `MTG_BRONZE` → `MTG_SILVER` → `MTG_GOLD` → `MTG_PIPELINE` (orquestrador, referencia os `job_id` dos 4 anteriores)
+- **Ordem**: `MTG_STAGE` → `MTG_BRONZE` → `MTG_SILVER` → `MTG_GOLD` → `MTG_PIPELINE` (não é orquestrador: o deploy copia as tasks das 4 camadas para dentro dele, num job com um cluster só; os jobs de camada ficam para rodar uma camada avulsa)
 - **Smoke test**: roda um notebook no ambiente recém-deployado
 
 ### Publicação em Produção
-- **Trigger**: CI da `main` verde após um push — **merge na `main` = produção**, sem tag nem aprovação manual. Merge só de documentação (README, `docs/`) não dispara: vai junto na próxima publicação de código
+- **Trigger**: CI da `main` verde após um push — **merge na `main` = produção**, sem tag nem aprovação manual. Merge só de documentação fora de `src/` (README, `docs/`) não dispara: vai junto na próxima publicação de código
 - **Snapshot**: o repo inteiro é copiado para o repo de prd, commitado e marcado com a tag `prd-AAAAMMDD-HHMM-<sha7>`
 - **Deploy**: o `deploy-prd.yml` do repo de prd revalida, cria os jobs `MTG_*_PRD` apontando para a tag e roda o smoke test
-- **Carga**: se o snapshot publicado mudou algum arquivo (código ou não), dispara o `MTG_PIPELINE_PRD` na hora
+- **Carga**: se o snapshot publicado mudou algum arquivo que não é documentação (`*.md`, `docs/`), dispara o `MTG_PIPELINE_PRD` na hora
 - **Rollback**: `Actions → Deploy produção (MTG) → Run workflow` no repo de prd, com a tag anterior (marque `rodar` para reprocessar)
 - **Token**: `PRD_DISPATCH_TOKEN` (PAT com *Contents* e *Workflows* no repo de prd); o `check-credenciais.yml` avisa 60 dias antes de expirar
 
@@ -192,21 +192,21 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 
 ### Scryfall API
 - **URL**: `https://api.scryfall.com`
-- **Dados**: Cartas, Sets, Preços de mercado (USD, EUR, TIX), Símbolos de mana, Rulings, Migrações de ID
+- **Dados**: Cartas, Sets, Preços de mercado (USD, EUR, TIX), Rulings, Migrações de ID
 - **Características**: API pública, sem necessidade de chave; bulk-data: cards, card_prices e rulings baixam cada um o seu arquivo em 1 download, sem paginação manual (cards e card_prices baixam o mesmo `default_cards`)
 - **Rate Limiting**: requisições sequenciais com retry/backoff (`obter_http_com_retentativa`) em 429/5xx
 
 
 ### Entidades Principais
-- **Cartas**: catálogo completo via bulk-data
-- **Sets**: Todas as expansões
+- **Cartas**: bulk-data, filtrado pelas coleções da janela de `years_back` (padrão 5 anos)
+- **Sets**: expansões lançadas dentro da mesma janela
 - **Preços**: Histórico de preços (uma linha por coleta, sem dedup)
 - **Rulings**: Esclarecimentos oficiais de regras por carta
 - **Migrations**: Histórico de reconciliação de IDs de carta
 
 ### Processamento e Resiliência (Stage)
 - **Bulk-data**: catálogo completo em um único download (sem paginação)
-- **Idempotência**: arquivos datados, reexecução não reescreve arquivo já gravado com o mesmo nome
+- **Idempotência**: arquivos datados, reexecução não reescreve arquivo já gravado por completo (com `_SUCCESS`) com o mesmo nome
 - **Tolerância a Falhas**: retry com backoff em erros HTTP transitórios
 
 
@@ -256,6 +256,8 @@ spark_conf:
   spark.databricks.delta.preview.enabled: "true"
   spark.databricks.delta.optimizeWrite.enabled: "true"
   spark.databricks.delta.autoCompact.enabled: "true"
+spark_env_vars:
+  PYSPARK_PYTHON: "/databricks/python3/bin/python3"
 ```
 
 Por que single-node e sem instance pool (medido no run de prd de 27/09/2026):

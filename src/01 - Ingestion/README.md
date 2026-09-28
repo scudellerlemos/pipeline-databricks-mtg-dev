@@ -11,7 +11,7 @@
 ## Visão Geral
 
 Camada **Stage**: coleta dados brutos da Scryfall e persiste em Parquet no S3, sem
-nenhuma regra de negócio (isso é Bronze/Silver). Responsabilidade única: garantir que
+nenhuma regra de negócio (isso é Silver/Gold). Responsabilidade única: garantir que
 o dado foi obtido corretamente, gravado de forma íntegra, idempotente e reprocessável,
 com controle de execução auditável.
 
@@ -23,8 +23,8 @@ Os cinco notebooks usam exclusivamente a
 - **`cards.py`** e **`card_prices.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
   (`default_cards`, ambos) — 1 request pro índice + 1 download do `.jsonl.gz`
   inteiro, filtrado em memória. Sem paginação, sem 1 request por carta/coleção.
-- **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
-  sem paginação. Captura também `card_count`, `parent_set_code`, `block` e
+- **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`);
+  o código segue `next_page` por precaução. Captura também `card_count`, `parent_set_code`, `block` e
   `icon_svg_uri` (campos nativos da Scryfall).
 - **`rulings.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data) (`rulings`)
   — mesmo padrão de `cards.py`/`card_prices.py` (1 request pro índice + 1
@@ -41,7 +41,7 @@ Os cinco notebooks usam exclusivamente a
   `metadata.set_code`/`metadata.collector_number` (flattenados em colunas
   `metadata_*`). Sem filtro
   temporal: cortar por data quebraria a rastreabilidade de IDs antigos que
-  Bronze/Silver podem precisar resolver, mesmo tratando de cartas antigas.
+  Silver/Gold podem precisar resolver, mesmo tratando de cartas antigas.
 
 **Todas as tabelas são snapshot**: cada run relê o catálogo inteiro da Scryfall
 (recortado por `years_back` onde se aplica) e decide o que gravar via idempotência
@@ -64,7 +64,7 @@ do pipeline, não limite da fonte.
 **Escopo fechado (decisão de produto, 09/2026):**
 
 - **Frequência mensal**, inclusive para preço - 1 ponto por impressão por mês.
-- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção. Fica de fora
+- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção (sets/cards) ou da impressão (card_prices). Fica de fora
   ~43% das cartas (as sem impressão na janela) e as impressões antigas das cartas que
   estão dentro - de propósito.
 
@@ -72,7 +72,7 @@ do pipeline, não limite da fonte.
 
 | Notebook | Fonte | Grão | Observação |
 |---|---|---|---|
-| `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `codigos_colecoes` dentro da janela `years_back` (via `sets`) |
+| `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `codigos_colecoes` dentro da janela `years_back` (códigos do endpoint `/sets`, independente de `sets.py`) |
 | `sets.py` | `GET /sets` | 1 linha por coleção | Filtra por `releaseDate >= cutoff` |
 | `card_prices.py` | `bulk-data/default_cards` | 1 linha por impressão (`id`) | Filtra por `releaseDate >= cutoff`, independente de `cards.py` |
 | `rulings.py` | `bulk-data/rulings` | 1 linha por ruling (referenciada por `oracle_id`) | Sem filtro temporal, catálogo inteiro (~79k linhas) |
@@ -91,7 +91,7 @@ com as tasks em paralelo.
 `ingestion_utils.py` concentra o que é comum aos notebooks (`%run ./ingestion_utils`):
 `obter_segredo`, `configurar_armazenamento_s3`, `obter_http_com_retentativa`, `salvar_em_parquet`,
 `obter_codigos_colecoes_scryfall_desde`, `iniciar_execucao`/`finalizar_execucao`, `executar_ingestao_stage`
-(padroniza o wrapper `iniciar_execucao` → `try`/ingest → `finalizar_execucao` repetido nos 6
+(padroniza o wrapper `iniciar_execucao` → `try`/ingest → `finalizar_execucao` repetido nos 5
 notebooks — cada um só chama `executar_ingestao_stage(nome_tabela, endpoint,
 funcao_ingestao, CAMINHO_S3_STAGE)` e monta seu próprio relatório com o DataFrame
 devolvido).
@@ -129,7 +129,7 @@ scryfall_api_url     # URL base da Scryfall API
 s3_bucket             # Bucket S3
 s3_stage_prefix       # Prefixo do staging (padrão: "stage")
 years_back            # Janela temporal em anos (padrão: 5)
-max_retries           # Tentativas de retry por request HTTP (padrão: 3)
+max_retries           # Tentativas totais por request HTTP (padrão: 3 = 1 + 2 retries)
 ```
 
 ## Estrutura no S3
@@ -156,8 +156,8 @@ s3://{bucket}/{stage_prefix}/
 
 ## Idempotência e controle de execução
 
-- **Nome de arquivo determinístico** — se o arquivo já existe, a run
-  pula essa partição (`files_skipped`) em vez de sobrescrever. Os cinco notebooks
+- **Nome de arquivo determinístico** — se a pasta do arquivo já existe com `_SUCCESS`, a run
+  pula essa partição (`files_skipped`); pasta sem `_SUCCESS` (escrita interrompida) é regravada. Os cinco notebooks
   usam o mesmo esquema via `salvar_em_parquet()` (`nome_arquivo_parquet()`).
   `{YYYYMMDD}` é a data completa da execução; `{year}_{month}` é a partição -
   a data da execução, exceto em `sets` e `card_prices`, onde vem do
@@ -190,5 +190,5 @@ dado de origem.
 ## Fora de escopo da Stage
 
 Nome padronizado, dedup de negócio, PK/FK, modelagem dimensional, tratamento de NULL
-para consumo analítico — isso é Bronze/Silver. A Stage só garante que o dado chegou
+para consumo analítico — isso é Silver/Gold. A Stage só garante que o dado chegou
 completo, íntegro e rastreável no S3.

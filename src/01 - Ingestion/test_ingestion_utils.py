@@ -187,7 +187,7 @@ def test_executar_ingestao_stage_df_none_levanta():
 
 
 def test_como_float_converte_int_e_preserva_none():
-    # Scryfall pode devolver int (ex.: mana_value 0) e o schema e DoubleType;
+    # Scryfall pode devolver int (ex.: cmc 0) e o schema e FloatType;
     # createDataFrame rejeita int nesse caso.
     assert ingestion_utils.como_float(0) == 0.0
     assert isinstance(ingestion_utils.como_float(0), float)

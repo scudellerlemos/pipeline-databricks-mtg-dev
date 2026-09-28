@@ -42,12 +42,12 @@ torna impossível reprocessar uma etapa sem refazer as outras.
 - **Silver** (`src/03 - Silver`): limpeza, tipagem e nomenclatura PT-BR com
   classificação DAMA-DMBOK (`TB_FATO_*`, `TB_DIM_*`, ...).
 - **Gold** (`src/04 - Gold`): uma visão de mercado pronta para consumo
-  (`TB_FATO_MERCADO_CARTAS`).
+  (`TB_FATO_MERCADO_CARTAS` + dimensão `TB_DIM_CARTAS`, ver ADR-013).
 
 Cada camada é um job (`MTG_STAGE`, `MTG_BRONZE`, `MTG_SILVER`, `MTG_GOLD`) e o
-`MTG_PIPELINE` orquestra a ordem. No YAML ele lista as camadas como
-`run_job_task`; o deploy embute as tasks de cada camada num job só, com um
-cluster só (antes cada camada subia o próprio, ~115s de setup cada).
+`MTG_PIPELINE` roda tudo em ordem. Não há orquestrador chamando os outros jobs:
+no YAML ele lista as camadas como `run_job_task` só como marcador, e o deploy
+troca cada uma pelas tasks da camada, num job só com um cluster só (antes cada camada subia o próprio, ~115s de setup cada).
 
 **Consequências.** Qualquer camada reprocessa sozinha a partir da anterior. O
 custo é armazenar o dado em cada camada (Parquet na Stage + Delta em Bronze/Silver/Gold), irrelevante no volume atual.
@@ -59,12 +59,12 @@ catálogo inteiro. Preço muda diariamente, mas a análise é de tendência.
 
 **Decisão.** Carga completa a cada execução, agendada no `MTG_PIPELINE` para a
 1ª segunda-feira do mês, 6h (`America/Sao_Paulo`). O nome do arquivo da Stage é
-`{ano}_{mes}_{dia}_{tabela}.parquet`: `{dia}` é sempre o dia da execução
+`{ano}_{mes}_{AAAAMMDD}_{tabela}.parquet`: `{AAAAMMDD}` é sempre a data da execução
 (rastreabilidade e idempotência por dia). Em `sets` e `card_prices`, `{ano}_{mes}`
 vêm do `releaseDate` e há uma janela de anos sobre ele; nas demais, da própria
 execução.
 
-**Consequências.** Lógica simples, sem estado de "até onde já li". O histórico
+**Consequências.** Stage simples, sem estado de "até onde já li" (Bronze e Silver leem incremental a partir da camada anterior, exceto migrações; a Gold relê a Silver e grava a fato incremental). O histórico
 de preço tem uma coleta por execução agendada (mensal) — mais nas publicações
 com código novo
 ([ADR-011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd)).
@@ -83,7 +83,8 @@ por curiosidade — sem duplicar dado.
   a Bronze é o histórico bruto.
 - **Silver** deduplica a origem pela chave de negócio (`row_number` quando há
   coluna de ordenação, senão `dropDuplicates`) e grava com merge do Delta
-  (`DeltaTable.merge`) por essa chave. Na primeira carga, sem tabela ainda, é
+  (`DeltaTable.merge`) por essa chave. Lê da Bronze só o que entrou depois do
+  último `DT_INGESTAO_BRONZE` gravado (migrações lê inteira). Na primeira carga, sem tabela ainda, é
   `overwrite`.
 - **Gold**: dimensão com `overwrite`, fato com MERGE incremental que propaga
   mudança da dimensão ao histórico; chave duplicada no lote aborta a run
@@ -91,7 +92,7 @@ por curiosidade — sem duplicar dado.
 - Toda camada valida o schema antes de gravar: a Stage aborta se coluna
   obrigatória vier nula (`colunas_obrigatorias` no `salvar_em_parquet`); Bronze,
   Silver e Gold comparam o lote com a tabela e com o `*_column_docs`
-  (`validar_contrato_esquema`). Coluna nova passa; coluna removida ou tipo
+  (`validar_contrato_esquema`). Coluna nova passa se estiver documentada no `*_column_docs`; coluna removida ou tipo
   alterado só com `permitir_quebra_esquema=True`.
 
 **Consequências.** Toda camada é idempotente, o que viabiliza a [ADR-011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd)
@@ -100,8 +101,8 @@ saída é retenção/`VACUUM`, não mudar o modo de escrita.
 
 ## ADR-004 — Jobs em YAML + `deploy.py`, sem Asset Bundles
 
-**Contexto.** São 5 jobs, com o orquestrador referenciando os outros 4 por
-`job_id`, que só existe depois do deploy.
+**Contexto.** São 5 jobs, e o `MTG_PIPELINE` é montado com as tasks dos outros 4
+na hora do deploy.
 
 **Decisão.** Cada job é um YAML em `.github/DAGs/`. O `.github/scripts/deploy.py`
 faz o deploy na ordem Stage → Bronze → Silver → Gold → Pipeline, troca cada
@@ -180,8 +181,9 @@ reviewer.
 
 O push na `main` só roda o CI quando mexe em `src/`, `.github/DAGs`,
 `.github/workflows`, `.github/scripts`, `.github/prd` ou
-`.github/requirements-ci.txt`. Merge só de documentação não publica: o README
-e o `docs/` chegam ao repo de prd na próxima publicação de código.
+`.github/requirements-ci.txt`. Merge só de documentação fora de `src/` não publica: o README
+e o `docs/` chegam ao repo de prd na próxima publicação de código. Um `.md`
+dentro de `src/` publica, mas sem rodar o pipeline de prd (ADR-011).
 
 **Consequências.** Caminho único e rápido até produção. A proteção passa a ser
 o CI verde e a revisão do PR. Numa equipe, o gate de aprovação no environment
@@ -284,7 +286,7 @@ precisa ser tabela física para consumo (BI/Genie).
   segue a antiga e a próxima run acha as mesmas cartas mudadas. Sem time
   travel: o log Delta guarda 30 dias e a run é mensal (28-35 dias).
 - Carga completa (`overwrite`) quando a fato ou a dimensão não existem, a
-  dimensão mudou de colunas, ou com o widget `rebuild=true`.
+  fato está vazia, a dimensão mudou de colunas, ou com o widget `rebuild=true`.
 
 **Consequências.** O custo da run segue o volume novo, não o histórico, e
 migração/ruling novo continuam valendo para cotações antigas. O incremental

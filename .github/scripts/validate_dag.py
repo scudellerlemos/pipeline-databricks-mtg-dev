@@ -3,7 +3,7 @@
 Validacao estrutural dos jobs Databricks definidos em .github/DAGs/*.yml.
 
 Cada arquivo tem um job em resources.jobs, deployado como job separado. O
-orquestrador e validado ja com as camadas embutidas, como o deploy manda.
+MTG_PIPELINE e validado ja com as camadas embutidas, como o deploy manda.
 """
 
 import json
@@ -115,7 +115,7 @@ def validar_sintaxe_notebooks(caminho_yaml, chave_job, job):
 
 def validar_config_cluster(caminho_yaml, chave_job, job):
     if not tem_tarefas_notebook(job):
-        return  # job so-orquestrador (run_job_task) nao roda notebook, nao precisa de cluster
+        return  # job so de run_job_task nao roda notebook, nao precisa de cluster
     if "job_clusters" not in job:
         raise ValueError(f"{caminho_yaml} ({chave_job}): job_clusters ausente")
     for cluster in job["job_clusters"]:
@@ -133,7 +133,7 @@ def validar_config_cluster(caminho_yaml, chave_job, job):
 
 def validar_config_git(caminho_yaml, chave_job, job):
     if not tem_tarefas_notebook(job):
-        return  # job so-orquestrador nao le notebook via git_source
+        return  # job so de run_job_task nao le notebook via git_source
     if "git_source" not in job:
         raise ValueError(f"{caminho_yaml} ({chave_job}): git_source ausente")
     for campo in ["git_url", "git_provider", "git_branch"]:

@@ -81,7 +81,7 @@ Todas as colunas a partir da Silver são em PT-BR, sem acento, 100% MAIÚSCULAS 
 - **ANO_/MES_**: Colunas derivadas usadas só como `colunas_particao`
 
 ### Regra "sem `( ) { }` no dado Silver"
-Todo texto livre/estrutura serializada da fonte converte `{...}`/`(...)` para `[...]` na Silver, sem exceção por tabela - presença de parêntese/chave no dado Silver indica transformação incompleta.
+As colunas `DESC_` de texto livre/estrutura serializada tratadas em cada notebook convertem `{...}`/`(...)` para `[...]` - presença de parêntese/chave no dado Silver indica transformação incompleta.
 
 ## Como Usar Esta Documentação
 
@@ -101,13 +101,13 @@ Todo texto livre/estrutura serializada da fonte converte `{...}`/`(...)` para `[
 1. **Configuração**: Verifique segredos e configurações necessárias
 2. **Monitoramento**: Acompanhe logs e métricas de processamento
 3. **Manutenção**: Entenda estratégias de merge e atualização incremental
-4. **Documentação no Unity Catalog**: `COMMENT ON TABLE`/`ALTER COLUMN ... COMMENT` são aplicados automaticamente por todo notebook via `silver_utils.aplicar_documentacao_tabela`, com o texto centralizado em `silver_column_docs.py`
+4. **Documentação no Unity Catalog**: `COMMENT ON TABLE`/`ALTER COLUMN ... COMMENT` são aplicados automaticamente por todo notebook via `base_utils.aplicar_documentacao_tabela` (chamada por `salvar_na_silver`), só no que mudou, com o texto centralizado em `silver_column_docs.py`
 
 ## Controle de Qualidade
 
 ### Validações Implementadas
 - **Schema Padronizado**: Nomenclatura PT-BR consistente
-- **Chave Única Sinalizada**: `PRIMARY KEY` sempre declarada no Unity Catalog; a run falha (RuntimeError) se a chave tiver NULO ou duplicata
+- **Chave Única Sinalizada**: `PRIMARY KEY` sempre declarada no Unity Catalog; a run falha se a chave tiver NULO ou duplicata (`RuntimeError` na primeira carga; depois, NULO é barrado pela constraint NOT NULL no MERGE)
 - **Particionamento Adequado**: Otimização de performance
 - **Limpeza de Dados**: Sem `( ) { }` remanescente no dado Silver
 - **Merge Incremental**: Atualização idempotente pela chave única de cada tabela

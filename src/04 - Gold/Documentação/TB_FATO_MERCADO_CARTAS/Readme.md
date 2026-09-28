@@ -19,14 +19,14 @@ Visão única de mercado de cartas de Magic: The Gathering - combina catálogo d
 - Medida (`VLR_USD`/`VLR_USD_FOIL`/`VLR_USD_ETCHED`/`VLR_EUR`/`VLR_EUR_FOIL`/`VLR_TIX`) NULA continua NULA - 0 não é "sem cotação".
 - `QTD_ESCLARECIMENTOS` NULO -> 0 (zero é valor real).
 - Data NULA -> sentinela `1001-01-01`.
-- Chave (`ID_CARTA`, `DT_COTACAO`) nunca é mascarada - run falha (`RuntimeError`) se vier NULA.
+- Chave (`ID_CARTA`, `DT_COTACAO`) nunca é mascarada - run falha se vier NULA (`RuntimeError` na carga completa; constraint NOT NULL no MERGE).
 - `ID_CARTA_CANONICO` nunca é NULO - cai no próprio `ID_CARTA` quando não há migração.
 
 ## 6. Carga
-`TB_DIM_CARTAS` é recalculada e gravada com `overwrite` a cada execução. Esta tabela é incremental: MERGE só com as cotações posteriores à última `DT_COTACAO` gravada e com todo o histórico das cartas que mudaram em `TB_DIM_CARTAS` (atributo novo, como migração ou ruling, vale para cotações antigas). Chave duplicada no lote aborta antes de gravar. Carga completa (`overwrite`) na primeira execução, se a dimensão mudar de colunas ou com o widget `rebuild=true` — único jeito de tirar da Gold uma cotação apagada da Silver. Particionada por `ANO_COTACAO`/`MES_COTACAO`.
+`TB_DIM_CARTAS` é recalculada e gravada com `overwrite` a cada execução. Esta tabela é incremental: MERGE só com as cotações posteriores à última `DT_COTACAO` gravada e com todo o histórico das cartas que mudaram em `TB_DIM_CARTAS` (atributo novo, como migração ou ruling, vale para cotações antigas). Chave duplicada no lote aborta antes de gravar. Carga completa (`overwrite`) na primeira execução (ou com a fato vazia), se a dimensão mudar de colunas ou com o widget `rebuild=true` — único jeito de tirar da Gold uma cotação apagada da Silver. Particionada por `ANO_COTACAO`/`MES_COTACAO`.
 
 ## 7. Data Quality e Auditoria
-Abortam a run: PK (desta tabela ou de `TB_DIM_CARTAS`) com chave NULA ou duplicada (no lote, antes de gravar; ou já gravada na tabela), `ID_ORACLE` nulo, valor negativo de preço e nulo residual em coluna categórica (limite 0); no pré-join, preços sem carta acima de 12000. Só informativos: coleção não encontrada, cartas sem cotação e ids migrados. 1 linha de auditoria em `TB_AUDITORIA_GOLD` (run id, início/fim, duração, contagens, resultado de DQ, status) por execução, inclusive as abortadas (gravada num `finally`): `SUCESSO`, `FALHA_DQ` (DQ pré-join ou pós-carga), `FALHA_DQ_PK` (validação de PK) ou `FALHA` (erro inesperado).
+Abortam a run: chave duplicada no lote (desta tabela ou de `TB_DIM_CARTAS`, antes de gravar); NULO/duplicata na tabela gravada, validados só na carga completa (no MERGE incremental, chave NULA é barrada pela constraint NOT NULL do Delta); `ID_ORACLE` nulo, valor negativo de preço e nulo residual em coluna categórica (limite 0); no pré-join, preços sem carta acima de 12000. Só informativos: coleção não encontrada, cartas sem cotação e ids migrados. 1 linha de auditoria em `TB_AUDITORIA_GOLD` (run id, início/fim, duração, contagens, resultado de DQ, status) por execução, inclusive as abortadas (gravada num `finally`): `SUCESSO`, `FALHA_DQ` (DQ pré-join ou pós-carga), `FALHA_DQ_PK` (validação de PK) ou `FALHA` (erro inesperado).
 
 ## 8. Histórico de Alterações
 | Data | Responsável | Alteração |

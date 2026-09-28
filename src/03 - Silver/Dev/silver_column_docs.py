@@ -8,7 +8,7 @@ salvar_tabela_silver. Cada notebook chama obter_comentario_tabela(nome) e
 obter_comentarios_colunas(nome) após %run ./silver_column_docs.
 
 Descrições de negócio (o que a coluna significa), não de cálculo.
-Os READMEs de Documentação/ repetem este texto à mão: ao mudar aqui, mudar lá.
+Os READMEs de Documentação/ resumem este texto à mão: ao mudar o sentido aqui, mudar lá.
 """
 
 # Colunas de linhagem (Stage/Bronze), iguais em todas as tabelas Silver.
@@ -18,7 +18,7 @@ COLUNAS_COMUNS = {
     "DESC_URL_ORIGEM": "Nome lógico da tabela de origem na Stage (ex.: 'cards'), não a URL da API.",
     "DESC_ARQUIVO_ORIGEM": "Caminho do arquivo Parquet de origem na Stage - usado só para auditoria/rastreabilidade.",
     "ID_EXECUCAO_BRONZE": "Id da execução da Bronze que originou esta linha - usado só para auditoria/rastreabilidade.",
-    "DT_INGESTAO_BRONZE": "Data/hora em que a Bronze processou o registro - usado só para auditoria/rastreabilidade.",
+    "DT_INGESTAO_BRONZE": "Data/hora em que a Bronze processou o registro - rastreabilidade e corte da carga incremental da Silver (lê só a Bronze mais nova que o max desta coluna; TB_MOV_MIGRACOES_CARTAS relê a Bronze inteira).",
 }
 
 TABELAS_SILVER = {

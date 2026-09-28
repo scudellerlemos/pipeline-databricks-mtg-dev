@@ -40,6 +40,8 @@ spark.sql(r"""
 ```
 
 ### Load - Carregamento na Silver
+Extract incremental: com a tabela Silver já existente, lê só a Bronze com `bronze_ingestion_timestamp` > `max(DT_INGESTAO_BRONZE)`; sem ela, lê a Bronze inteira (`extrair_da_bronze`). `TB_MOV_MIGRACOES_CARTAS` sempre lê a Bronze inteira (a cadeia de ids precisa de todas as migrações). A transformação fica em cache para o MERGE e o count.
+
 A primeira carga (Delta inexistente) é `overwrite`. As seguintes usam o merge builder do Delta (`DeltaTable.merge()` com `withSchemaEvolution()`), condição nula-segura `silver.<chave> <=> novo.<chave>` (`salvar_na_silver` em `silver_utils.py`):
 ```python
 (
@@ -55,7 +57,7 @@ Antes do merge há dedup por chave: `row_number()` (ordem por `coluna_ordenacao`
 
 ## Estrutura dos Notebooks
 
-São 5 notebooks, orquestrados por `.github/DAGs/silver.yml` (detalhe de cada tabela em [`Documentação/Readme.md`](./Documentação/Readme.md)):
+São 5 notebooks, tasks do job MTG_SILVER (`.github/DAGs/silver.yml`, embutidas no MTG_PIPELINE) (detalhe de cada tabela em [`Documentação/Readme.md`](./Documentação/Readme.md)):
 
 | Notebook | Chave | `coluna_ordenacao` (dedup) | Partição |
 |---|---|---|---|
@@ -118,7 +120,6 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 ## Controle de Qualidade
 
 ### Validações Implementadas
-- **Verificação de DataFrame nulo** (None; DataFrame vazio não é bloqueado)
 - **Remoção de duplicatas**
 - **Compatibilidade de schema**
 - **Merge incremental**
@@ -132,7 +133,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 
 ### Logs e Monitoramento
 - **Contagem de registros**: Antes e depois do processamento
-- **Schema**: diferença de colunas entre origem e destino é avisada no log
+- **Schema**: coluna nova é logada; coluna removida, tipo alterado ou coluna fora do `silver_column_docs` aborta antes de gravar (`permitir_quebra_esquema=True` libera remoção/tipo, não a divergência com o column_docs)
 
 ## Características dos Dados
 
@@ -148,7 +149,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 - **Filtro**: nenhum na Silver (não depende de `TB_FATO_CARTAS`); a Stage já restringe a impressões com `releaseDate` >= 1º de janeiro de (ano atual − `years_back`, padrão 5)
 - **Merge**: Incremental por `ID_CARTA` + `DT_INGESTAO`
 - **Particionamento**: `ANO_INGESTAO`/`MES_INGESTAO`
-- **Frequência**: Atualização frequente (preços dinâmicos)
+- **Frequência**: Mensal (1 coleta por mês)
 - **Fonte**: Scryfall (todas as tabelas da Silver vêm da Scryfall)
 - **Tipo**: Market Data (dados dinâmicos)
 
@@ -169,7 +170,7 @@ tabela_delta.alias("silver").merge(df_final.alias("novo"), "silver.ID_CARTA <=> 
 ### Metadados das Tabelas
 - **`COMMENT ON TABLE`**: descrição de negócio + "Chave única: ..." (de `silver_column_docs.py`)
 - **`COMMENT` por coluna**: vindo de `silver_column_docs.py`
-- **`PRIMARY KEY`**: sempre declarada na chave; a run falha (RuntimeError) se a chave tiver NULO ou duplicata
+- **`PRIMARY KEY`**: sempre declarada na chave; a run falha se a chave tiver NULO ou duplicata (`RuntimeError` na primeira carga; depois, NULO é barrado pela constraint NOT NULL no MERGE)
 - Nenhuma `TBLPROPERTIES` customizada é gravada
 
 ### Particionamento das Tabelas
@@ -224,7 +225,7 @@ condicao_merge = " AND ".join(f"silver.{k} <=> novo.{k}" for k in colunas_chave)
 
 #### Regra #3: Compatibilidade de Schema
 ```python
-# Diferença de schema só é logada; coluna nova entra pelo merge
+# Contrato de schema valida antes (remoção, tipo ou coluna não documentada abortam); coluna nova entra pelo merge
 .merge(df_final.alias("novo"), condicao_merge).withSchemaEvolution()
 ```
 

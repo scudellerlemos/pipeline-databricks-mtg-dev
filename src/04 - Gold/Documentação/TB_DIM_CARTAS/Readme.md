@@ -22,7 +22,7 @@ Mesmas de `TB_FATO_MERCADO_CARTAS` para as colunas em comum: `NME_COLECAO`/`NME_
 Recalculada inteira e gravada com `overwrite` a cada execução (tamanho do catálogo, não cresce com o histórico). A dimensão recalculada é comparada com a gravada (`EXCEPT`): as cartas que mudaram têm todo o histórico reprocessado em `TB_FATO_MERCADO_CARTAS`. É gravada depois da fato: se a fato falhar, esta tabela segue a antiga e a próxima run acha as mesmas cartas mudadas ([ADR-013](../../../../docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)). Mesmo notebook e mesma task da fato (`Dev/TB_FATO_MERCADO_CARTAS.py`).
 
 ## 7. Data Quality e Auditoria
-PK com chave NULA ou duplicada aborta a run (`FALHA_DQ_PK`). Os DQs pré-join e a auditoria em `TB_AUDITORIA_GOLD` são os da execução de `TB_FATO_MERCADO_CARTAS` (1 linha por run cobre as duas tabelas).
+Chave duplicada no lote aborta antes de gravar (`FALHA_DQ_PK`); NULO/duplicata na tabela são validados depois do overwrite (NULO com a PK já declarada é barrado pela constraint NOT NULL do Delta). Os DQs pré-join e a auditoria em `TB_AUDITORIA_GOLD` são os da execução de `TB_FATO_MERCADO_CARTAS` (1 linha por run cobre as duas tabelas).
 
 ## 8. Histórico de Alterações
 | Data | Responsável | Alteração |

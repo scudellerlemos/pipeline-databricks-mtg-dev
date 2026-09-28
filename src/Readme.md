@@ -76,7 +76,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - Dados limpos e padronizados
 - Enriquecimento com categorias e métricas
 - Nomenclatura 100% PT-BR com prefixo semântico (ID_, NME_, DESC_, COD_, DT_, ANO_, MES_, QTD_, VLR_, NUM_, FLG_, URL_)
-- Nomenclatura de tabela DAMA-DMBOK (Fato/Dimensão/Domínio/Ponte)
+- Nomenclatura de tabela DAMA-DMBOK (Fato/Dimensão/Movimento)
 - Regras de negócio em SQL, com duas exceções em Python: a normalização de texto (`normalizar_valores`, UDF) e a resolução da cadeia de migrações de ID (`anexar_id_canonico` em TB_MOV_MIGRACOES_CARTAS, no driver)
 
 **Tabelas**:
@@ -91,8 +91,8 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 
 **Processo**: **AL (Analyze & Load)**
 - **Analyze**: Junção das tabelas Silver (cartas, coleções, preços, esclarecimentos, migrações) via SQL (`spark.sql()` sobre temp views)
-- **Load**: `DeltaTable.merge` (upsert idempotente), particionado por ano/mês de cotação
-- **Dados**: 1 tabela pronta para consumo direto (analista/BI/Genie), sem precisar conhecer Bronze/Silver
+- **Load**: dimensão `TB_DIM_CARTAS` em overwrite; fato em MERGE incremental (overwrite na carga completa), particionada por `ANO_COTACAO`/`MES_COTACAO`
+- **Dados**: 2 tabelas (dimensão + fato) prontas para consumo direto (analista/BI/Genie), sem precisar conhecer Bronze/Silver
 
 **Características**:
 - Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras + migrações de ID)
@@ -101,6 +101,7 @@ sem prefixo `TB_BRONZE_`, já que vivem no schema `bronze` do Unity Catalog.
 - Transformações em SQL puro, sem UDFs Python
 
 **Tabelas**:
+- **TB_DIM_CARTAS** - Atributos atuais de cada carta
 - **TB_FATO_MERCADO_CARTAS** - Visão única de mercado (catálogo + coleção + preço + esclarecimentos de regras + migrações de ID). Preços da Silver x `TB_DIM_CARTAS`
 
 ## Fluxo de Dados Completo
@@ -136,7 +137,7 @@ executar_ingestao_bronze(
 ### 3. Silver (03 - Silver)
 ```python
 # Extração da Bronze e transformação via SQL (spark.sql() sobre temp view)
-df_bronze = extrair_da_bronze(catalogo, "cards")
+df_bronze = processador.extrair_da_bronze("cards")  # incremental: só Bronze nova
 df_silver = spark.sql("SELECT ... FROM _cards_bronze")  # ver Dev/TB_FATO_CARTAS.py
 # MERGE idempotente na Silver + comentários/PK no Unity Catalog
 salvar_na_silver(df_silver, catalogo, "silver", "TB_FATO_CARTAS", caminho_s3_silver, ...)
@@ -147,8 +148,8 @@ salvar_na_silver(df_silver, catalogo, "silver", "TB_FATO_CARTAS", caminho_s3_sil
 # Extração das tabelas Silver e junção via SQL (spark.sql() sobre temp views)
 df_dim = spark.sql("SELECT ... FROM _cartas LEFT JOIN _colecoes ...")  # ver Dev/TB_FATO_MERCADO_CARTAS.py
 # Data quality + overwrite da dimensão + MERGE incremental da fato + auditoria em TB_AUDITORIA_GOLD
-salvar_na_gold(df_dim, catalogo, "gold", "TB_DIM_CARTAS", caminho_s3_gold, coluna_chave="ID_CARTA", ...)
-salvar_na_gold(spark.sql(consulta_fato_mercado(catalogo)), catalogo, "gold", "TB_FATO_MERCADO_CARTAS", caminho_s3_gold, ...)
+salvar_na_gold(spark.sql(consulta_fato_mercado(catalogo)), catalogo, "gold", "TB_FATO_MERCADO_CARTAS", caminho_s3_gold, ...)  # join com a view _dim_cartas
+salvar_na_gold(df_dim, catalogo, "gold", "TB_DIM_CARTAS", caminho_s3_gold, coluna_chave="ID_CARTA", ...)  # depois da fato
 ```
 
 ## Tecnologias Utilizadas
@@ -238,6 +239,6 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 ## Suporte e Contato
 
 Para dúvidas, sugestões ou problemas:
-- Documentação de cada camada (`src/*/Readme.md`)
+- Documentação de cada camada (README de cada pasta em `src/`)
 - Logs das runs no Databricks
 
