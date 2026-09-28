@@ -239,6 +239,6 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 ## Suporte e Contato
 
 Para dúvidas, sugestões ou problemas:
-- Documentação de cada camada (`src/*/Readme.md`)
+- Documentação de cada camada (README de cada pasta em `src/`)
 - Logs das runs no Databricks
 
