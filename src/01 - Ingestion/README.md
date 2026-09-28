@@ -11,7 +11,7 @@
 ## Visão Geral
 
 Camada **Stage**: coleta dados brutos da Scryfall e persiste em Parquet no S3, sem
-nenhuma regra de negócio (isso é Bronze/Silver). Responsabilidade única: garantir que
+nenhuma regra de negócio (isso é Silver/Gold). Responsabilidade única: garantir que
 o dado foi obtido corretamente, gravado de forma íntegra, idempotente e reprocessável,
 com controle de execução auditável.
 
@@ -190,5 +190,5 @@ dado de origem.
 ## Fora de escopo da Stage
 
 Nome padronizado, dedup de negócio, PK/FK, modelagem dimensional, tratamento de NULL
-para consumo analítico — isso é Bronze/Silver. A Stage só garante que o dado chegou
+para consumo analítico — isso é Silver/Gold. A Stage só garante que o dado chegou
 completo, íntegro e rastreável no S3.

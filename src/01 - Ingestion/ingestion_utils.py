@@ -8,7 +8,7 @@ Uso no notebook (Databricks):
 
 Código compartilhado pelos 5 notebooks da Stage: coleta da API Scryfall,
 gravação em Parquet no S3 e controle de execução. Sem CDC (a API não tem
-captura de alteração) e sem regra de negócio - isso fica na Bronze/Silver.
+captura de alteração) e sem regra de negócio - isso fica na Silver/Gold.
 """
 
 import json
