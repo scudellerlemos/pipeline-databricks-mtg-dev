@@ -26,7 +26,7 @@ processador.salvar_tabela_silver(df_silver, colunas_particao=["ANO_INGESTAO", "M
 
 import unicodedata
 
-from pyspark.sql.functions import col, hash, row_number, trim, initcap, regexp_replace, udf, when
+from pyspark.sql.functions import col, hash, lit, row_number, trim, initcap, regexp_replace, udf, when
 from pyspark.sql.types import StringType
 from pyspark.sql.window import Window
 from delta.tables import DeltaTable
@@ -105,13 +105,24 @@ def normalizar_valores(df, colunas):
 # ============================================================================
 # FUNÇÕES DE EXTRAÇÃO DA BRONZE
 # ============================================================================
-def extrair_da_bronze(catalogo, nome_tabela_bronze):
-    """EXTRACT: lê dados da camada Bronze"""
+def extrair_da_bronze(catalogo, nome_tabela_bronze, tabela_silver=None):
+    """EXTRACT: lê dados da camada Bronze.
+
+    Com tabela_silver já existente, lê só o que a Bronze recebeu depois da última
+    carga dela (bronze_ingestion_timestamp > max(DT_INGESTAO_BRONZE)). A Bronze é
+    append e guarda todos os snapshots; o que é antigo já foi mergeado. Sem a
+    tabela (primeira carga ou rebuild), lê a Bronze inteira.
+    """
     sessao_spark = obter_sessao_spark()
     tabela_bronze = f"{catalogo}.bronze.{nome_tabela_bronze}"
     # Sem try/except de propósito: erro de leitura (ex.: TABLE_OR_VIEW_NOT_FOUND)
     # deve derrubar a task Silver com a mensagem original.
     df = sessao_spark.table(tabela_bronze)
+    if tabela_silver and sessao_spark.catalog.tableExists(tabela_silver):
+        corte = sessao_spark.table(tabela_silver).agg({"DT_INGESTAO_BRONZE": "max"}).first()[0]
+        if corte is not None:
+            df = df.filter(col("bronze_ingestion_timestamp") > lit(corte))
+            print(f"Incremental: Bronze depois de {corte} (última carga de {tabela_silver})")
     print(f"Extraídos {df.count()} registros da Bronze: {tabela_bronze}")
     return df
 
@@ -298,7 +309,8 @@ class SilverTableProcessor:
 
     def extrair_da_bronze(self, nome_tabela_bronze):
         """Extrai dados da Bronze"""
-        return extrair_da_bronze(self.config['catalog_name'], nome_tabela_bronze)
+        tabela_silver = f"{self.config['catalog_name']}.{self.config['schema_silver']}.{self.nome_tabela}"
+        return extrair_da_bronze(self.config['catalog_name'], nome_tabela_bronze, tabela_silver)
 
     def transformar_dados(self, df, funcao_transformacao, **kwargs):
         """Aplica função de transformação personalizada (lógica em SQL, no notebook)"""
