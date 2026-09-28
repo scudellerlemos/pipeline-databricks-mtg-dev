@@ -36,7 +36,7 @@ from delta.tables import DeltaTable
 # são buscadas no user_ns do IPython (mesmo esquema de silver_utils.py).
 # ============================================================================
 try:
-    obter_sessao_spark, obter_segredo, configurar_unity_catalog, validar_contrato_esquema, campos_do_esquema
+    obter_sessao_spark, obter_segredo, configurar_unity_catalog, validar_contrato_esquema, campos_do_esquema, aplicar_documentacao_tabela
 except NameError:
     try:
         import IPython
@@ -46,6 +46,7 @@ except NameError:
         configurar_unity_catalog = _namespace_usuario["configurar_unity_catalog"]
         validar_contrato_esquema = _namespace_usuario["validar_contrato_esquema"]
         campos_do_esquema = _namespace_usuario["campos_do_esquema"]
+        aplicar_documentacao_tabela = _namespace_usuario["aplicar_documentacao_tabela"]
     except Exception:
         pass
 # ============================================================================
@@ -83,32 +84,11 @@ def extrair_da_silver(catalogo, nome_tabela_silver):
     return df
 
 # ============================================================================
-# DOCUMENTAÇÃO NO UNITY CATALOG
-# Duplicada de silver_utils.py de propósito: função de um arquivo %run'd não
-# fica visível dentro de outro arquivo %run'd.
+# DOCUMENTAÇÃO NO UNITY CATALOG (aplicar_documentacao_tabela vem da base_utils)
 # ============================================================================
 def _escapar_string_sql(valor):
     # Spark SQL não aceita '' como aspas escapada; usa backslash.
     return valor.replace("\\", "\\\\").replace("'", "\\'")
-
-
-def aplicar_documentacao_tabela(spark, nome_completo_tabela, comentario_tabela=None, comentarios_colunas=None):
-    """Aplica COMMENT ON TABLE / ALTER COLUMN...COMMENT no Unity Catalog.
-
-    Só metadados: roda em toda execução para manter a tabela em sincronia com
-    gold_column_docs.py.
-    """
-    if comentario_tabela:
-        spark.sql(f"COMMENT ON TABLE {nome_completo_tabela} IS '{_escapar_string_sql(comentario_tabela)}'")
-
-    if comentarios_colunas:
-        colunas_existentes = {f.name for f in spark.table(nome_completo_tabela).schema.fields}
-        for nome_coluna, comentario in comentarios_colunas.items():
-            if nome_coluna in colunas_existentes:
-                spark.sql(
-                    f"ALTER TABLE {nome_completo_tabela} "
-                    f"ALTER COLUMN `{nome_coluna}` COMMENT '{_escapar_string_sql(comentario)}'"
-                )
 
 
 def _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, colunas_chave):

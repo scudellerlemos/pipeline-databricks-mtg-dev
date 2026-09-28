@@ -201,3 +201,40 @@ def validar_contrato_esquema(nome_tabela, campos_atuais, campos_novos,
     if colunas_novas:
         print(f"[schema] {nome_tabela}: colunas novas {colunas_novas}")
     return colunas_novas
+
+
+# ============================================================================
+# DOCUMENTAÇÃO NO UNITY CATALOG
+# ============================================================================
+def escapar_string_sql(valor):
+    # Spark SQL não aceita '' (padrão ANSI) como aspa literal - dá
+    # ParseException. O escape que funciona é com backslash.
+    return valor.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def comentarios_a_aplicar(comentarios_atuais, comentarios_desejados):
+    """{coluna: comentario} do que precisa de ALTER: coluna existe na tabela e o
+    comentário atual é diferente. Coluna que a tabela ainda não tem fica de fora."""
+    return {
+        coluna: comentario
+        for coluna, comentario in comentarios_desejados.items()
+        if coluna in comentarios_atuais and comentarios_atuais[coluna] != comentario
+    }
+
+
+def aplicar_documentacao_tabela(spark, nome_completo_tabela, comentario_tabela=None, comentarios_colunas=None):
+    """Aplica COMMENT ON TABLE / ALTER COLUMN...COMMENT no Unity Catalog, só no
+    que mudou. Cada ALTER é um commit Delta (4-20s com o driver ocupado):
+    reaplicar tudo custava 5-7 min por camada em toda execução."""
+    if comentario_tabela and spark.catalog.getTable(nome_completo_tabela).description != comentario_tabela:
+        spark.sql(f"COMMENT ON TABLE {nome_completo_tabela} IS '{escapar_string_sql(comentario_tabela)}'")
+
+    if comentarios_colunas:
+        atuais = {f.name: f.metadata.get("comment") for f in spark.table(nome_completo_tabela).schema.fields}
+        mudaram = comentarios_a_aplicar(atuais, comentarios_colunas)
+        for nome_coluna, comentario in mudaram.items():
+            spark.sql(
+                f"ALTER TABLE {nome_completo_tabela} "
+                f"ALTER COLUMN `{nome_coluna}` COMMENT '{escapar_string_sql(comentario)}'"
+            )
+        print(f"[doc] {nome_completo_tabela}: {len(mudaram)} comentário(s) de coluna atualizado(s)")

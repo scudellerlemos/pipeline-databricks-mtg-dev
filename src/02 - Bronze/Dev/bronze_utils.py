@@ -27,13 +27,14 @@ from pyspark.sql.functions import col, current_timestamp, lit
 # Função de um arquivo %run'd não enxerga nomes de outro %run'd, então as de
 # base_utils vêm do namespace do IPython (mesmo esquema de silver_utils.py).
 try:
-    validar_contrato_esquema, campos_do_esquema
+    validar_contrato_esquema, campos_do_esquema, aplicar_documentacao_tabela
 except NameError:
     try:
         import IPython
         _namespace_usuario = IPython.get_ipython().user_ns
         validar_contrato_esquema = _namespace_usuario["validar_contrato_esquema"]
         campos_do_esquema = _namespace_usuario["campos_do_esquema"]
+        aplicar_documentacao_tabela = _namespace_usuario["aplicar_documentacao_tabela"]
     except Exception:
         pass
 
@@ -130,26 +131,6 @@ def _escapar_string_sql(valor):
     # Spark SQL não aceita '' (padrão ANSI) como aspa literal - dá
     # ParseException. O escape que funciona é com backslash.
     return valor.replace("\\", "\\\\").replace("'", "\\'")
-
-
-def aplicar_documentacao_tabela(spark, nome_completo_tabela, comentario_tabela=None, comentarios_colunas=None):
-    """Aplica COMMENT ON TABLE / ALTER COLUMN...COMMENT no Unity Catalog.
-
-    Só metadado, então roda em toda execução pra manter a tabela em sincronia
-    com bronze_column_docs.py. Colunas que ainda não existem na tabela são
-    ignoradas.
-    """
-    if comentario_tabela:
-        spark.sql(f"COMMENT ON TABLE {nome_completo_tabela} IS '{_escapar_string_sql(comentario_tabela)}'")
-
-    if comentarios_colunas:
-        colunas_existentes = {f.name for f in spark.table(nome_completo_tabela).schema.fields}
-        for nome_coluna, comentario in comentarios_colunas.items():
-            if nome_coluna in colunas_existentes:
-                spark.sql(
-                    f"ALTER TABLE {nome_completo_tabela} "
-                    f"ALTER COLUMN `{nome_coluna}` COMMENT '{_escapar_string_sql(comentario)}'"
-                )
 
 
 def anexar_na_bronze(df, caminho_delta, nome_completo_tabela, comentario_tabela=None):
