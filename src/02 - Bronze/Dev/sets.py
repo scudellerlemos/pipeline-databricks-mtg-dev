@@ -2,7 +2,7 @@
 # Camada Bronze - Sets - Magic: The Gathering
 # EL da Stage (S3/Parquet) para Bronze (Delta): so APPEND, dado 1:1 +
 # metadados tecnicos. Regras da camada em bronze_utils.py.
-# Sem filtro temporal/JOIN com cards aqui - isso e regra de negocio (Silver).
+# Sem filtro temporal/JOIN com cards aqui - filtro temporal fica na Stage, JOIN na Gold.
 
 # =============================================================================
 # FUNCOES COMPARTILHADAS (ver bronze_utils.py / bronze_column_docs.py)

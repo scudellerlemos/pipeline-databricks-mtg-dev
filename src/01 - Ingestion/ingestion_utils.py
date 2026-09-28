@@ -138,8 +138,8 @@ def obter_codigos_colecoes_scryfall_desde(url_api_scryfall, cabecalhos, data_cor
 def como_float(valor):
     """Converte para float, preservando None.
 
-    A Scryfall pode mandar int (ex.: mana_value 0) em campos Double/Float do
-    schema, e createDataFrame rejeita int em DoubleType.
+    A Scryfall pode mandar int (ex.: cmc 0) em campo FloatType do
+    schema, e createDataFrame rejeita int nesse caso.
     """
     return float(valor) if valor is not None else None
 
