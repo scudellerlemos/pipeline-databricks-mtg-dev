@@ -117,7 +117,7 @@ def test_status_pausa_do_alvo_vence_o_yaml():
     assert job["schedule"]["pause_status"] == "PAUSED"
 
 
-def test_orquestrador_sem_cluster_e_sem_git_nao_quebra():
+def test_pipeline_sem_cluster_e_sem_git_nao_quebra():
     # MTG_PIPELINE so tem run_job_task: nao tem job_clusters nem git_source.
     deploy = _deploy_com_ambiente(ALVO_PRD)
     job = deploy.aplicar_alvo({"name": "MTG_PIPELINE", "tasks": [{"task_key": "rodar_stage"}]})
@@ -189,7 +189,7 @@ def test_verificacao_pega_job_que_ficou_na_branch():
     assert divergencias == ["git_ref: 'main' -> 'v1.0.0'"]
 
 
-def test_orquestrador_embute_as_camadas_num_cluster_so():
+def test_pipeline_embute_as_camadas_num_cluster_so():
     # MTG_PIPELINE sobe com as tasks das 4 camadas e um job_cluster so; cada
     # camada espera a anterior inteira, e so a Stage herda o retry.
     deploy = _deploy_com_ambiente({})
@@ -250,13 +250,13 @@ if __name__ == "__main__":
     test_parametros_do_deploy_nao_vazam_pro_cluster()
     test_tag_substitui_branch_e_nunca_convivem()
     test_status_pausa_do_alvo_vence_o_yaml()
-    test_orquestrador_sem_cluster_e_sem_git_nao_quebra()
+    test_pipeline_sem_cluster_e_sem_git_nao_quebra()
     test_alerta_de_falha_e_injetado_em_todo_job()
     test_sem_MTG_ALERT_EMAIL_o_job_sobe_sem_bloco_de_email()
     test_verificacao_pega_alerta_que_sumiu()
     test_verificacao_pega_catalogo_que_nao_chegou_no_cluster()
     test_verificacao_pega_job_que_ficou_na_branch()
-    test_orquestrador_embute_as_camadas_num_cluster_so()
+    test_pipeline_embute_as_camadas_num_cluster_so()
     test_deploy_identico_nao_acusa_nada()
     test_campos_criticos_ignora_variavel_ambiente_que_nao_e_nossa()
     test_job_sem_git_e_sem_cluster_nao_quebra_a_verificacao()

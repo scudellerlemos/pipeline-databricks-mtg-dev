@@ -101,7 +101,7 @@ pipeline-databricks-mtg-dev/
 │   └── DAGs/
 │       ├── stage.yml              # Job MTG_STAGE
 │       ├── bronze.yml             # Job MTG_BRONZE
-│       ├── pipeline.yml           # Job MTG_PIPELINE (orquestrador)
+│       ├── pipeline.yml           # Job MTG_PIPELINE (pipeline inteiro num job)
 │       ├── silver.yml             # Job MTG_SILVER
 │       └── gold.yml               # Job MTG_GOLD
 │
@@ -165,7 +165,7 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 ### Deploy em Dev
 - **Trigger**: push na `main` que mexe em código (`src/`, `.github/{DAGs,workflows,scripts,prd}/`, `.github/requirements-ci.txt`) — merge só de docs fora de `src/` não deploya
 - **Ambiente**: GitHub Environment `Databricks` (secrets `DATABRICKS_HOST`/`DATABRICKS_TOKEN`)
-- **Ordem**: `MTG_STAGE` → `MTG_BRONZE` → `MTG_SILVER` → `MTG_GOLD` → `MTG_PIPELINE` (orquestrador: o deploy embute as tasks das 4 camadas num job com um cluster só)
+- **Ordem**: `MTG_STAGE` → `MTG_BRONZE` → `MTG_SILVER` → `MTG_GOLD` → `MTG_PIPELINE` (não é orquestrador: o deploy copia as tasks das 4 camadas para dentro dele, num job com um cluster só; os jobs de camada ficam para rodar uma camada avulsa)
 - **Smoke test**: roda um notebook no ambiente recém-deployado
 
 ### Publicação em Produção

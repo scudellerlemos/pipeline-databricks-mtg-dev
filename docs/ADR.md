@@ -45,9 +45,9 @@ torna impossível reprocessar uma etapa sem refazer as outras.
   (`TB_FATO_MERCADO_CARTAS` + dimensão `TB_DIM_CARTAS`, ver ADR-013).
 
 Cada camada é um job (`MTG_STAGE`, `MTG_BRONZE`, `MTG_SILVER`, `MTG_GOLD`) e o
-`MTG_PIPELINE` orquestra a ordem. No YAML ele lista as camadas como
-`run_job_task`; o deploy embute as tasks de cada camada num job só, com um
-cluster só (antes cada camada subia o próprio, ~115s de setup cada).
+`MTG_PIPELINE` roda tudo em ordem. Não há orquestrador chamando os outros jobs:
+no YAML ele lista as camadas como `run_job_task` só como marcador, e o deploy
+troca cada uma pelas tasks da camada, num job só com um cluster só (antes cada camada subia o próprio, ~115s de setup cada).
 
 **Consequências.** Qualquer camada reprocessa sozinha a partir da anterior. O
 custo é armazenar o dado em cada camada (Parquet na Stage + Delta em Bronze/Silver/Gold), irrelevante no volume atual.
@@ -101,8 +101,8 @@ saída é retenção/`VACUUM`, não mudar o modo de escrita.
 
 ## ADR-004 — Jobs em YAML + `deploy.py`, sem Asset Bundles
 
-**Contexto.** São 5 jobs, com o orquestrador reunindo as tasks dos outros 4,
-que têm de ser montadas na hora do deploy.
+**Contexto.** São 5 jobs, e o `MTG_PIPELINE` é montado com as tasks dos outros 4
+na hora do deploy.
 
 **Decisão.** Cada job é um YAML em `.github/DAGs/`. O `.github/scripts/deploy.py`
 faz o deploy na ordem Stage → Bronze → Silver → Gold → Pipeline, troca cada
