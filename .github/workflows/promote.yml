@@ -63,6 +63,15 @@ jobs:
           rsync -a --delete --exclude .git --exclude .prd --exclude .github/workflows ./ .prd/
           mkdir -p .prd/.github/workflows
           cp .github/prd/deploy-prd.yml .prd/.github/workflows/deploy-prd.yml
+          # O README e o de dev: badge passa a apontar pro deploy de prd e ganha
+          # um aviso de que aqui e so o snapshot publicado.
+          sed -i 's#pipeline-databricks-mtg-dev/actions/workflows/validate-pipeline.yml#pipeline-databricks-mtg-prd/actions/workflows/deploy-prd.yml#g' .prd/README.md
+          sed -i '1r /dev/stdin' .prd/README.md <<'AVISO'
+
+          > **Repositório de produção** (catálogo `mtg_prod`). Snapshot publicado
+          > automaticamente de [`pipeline-databricks-mtg-dev`](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev)
+          > a cada merge na `main` de lá. Não edite aqui: mudanças entram por PR em dev.
+          AVISO
           cd .prd
           git config user.name "github-actions[bot]"
           git config user.email "41898+github-actions[bot]@users.noreply.github.com"

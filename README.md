@@ -145,8 +145,8 @@ pipeline-databricks-mtg-dev/
 
 ## CI/CD Pipeline
 
-Dois ambientes no mesmo workspace: **dev** (este repo, catálogo `mtg_dev`, livre
-para experimentar) e **prd** (repo [`pipeline-databricks-mtg-prd`](https://github.com/scudellerlemos/pipeline-databricks-mtg-prd),
+Dois ambientes no mesmo workspace: **dev** (repo [`pipeline-databricks-mtg-dev`](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev),
+catálogo `mtg_dev`, livre para experimentar) e **prd** (repo [`pipeline-databricks-mtg-prd`](https://github.com/scudellerlemos/pipeline-databricks-mtg-prd),
 catálogo `mtg_prod`). O porquê de cada escolha está em [`docs/ADR.md`](docs/ADR.md).
 
 ```
