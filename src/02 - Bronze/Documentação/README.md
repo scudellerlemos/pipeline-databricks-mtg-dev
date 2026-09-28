@@ -59,13 +59,13 @@ se ela não existir. Toda execução segue o mesmo fluxo:
 1. Lista os diretórios `.parquet` com part-file em `{caminho_s3_stage}/{nome_tabela_stage}/` (ignora escrita não commitada).
 2. Descobre quais já foram carregados (via `source_file` distinto já presente na Bronze).
 3. Lê só os arquivos novos, adiciona as 3 colunas técnicas.
-4. Valida o contrato de schema (`validar_contrato_esquema` em base_utils): coluna nova entra com aviso; coluna removida, tipo alterado ou coluna fora do `bronze_column_docs` aborta sem gravar. Mudança intencional: `permitir_quebra_esquema=True` no notebook.
+4. Valida o contrato de schema (`validar_contrato_esquema` em base_utils): o lote tem que ter exatamente as colunas do `bronze_column_docs` (coluna não documentada ou documentada ausente aborta, mesmo com `permitir_quebra_esquema`); coluna nova documentada entra com aviso; coluna removida ou tipo alterado aborta sem gravar, salvo `permitir_quebra_esquema=True` no notebook.
 5. Append no Delta com `mergeSchema=true`.
-6. Garante a tabela no Unity Catalog (`CREATE TABLE ... LOCATION` só se ela não existir, nunca `DROP`) e aplica `COMMENT ON TABLE`/`ALTER COLUMN ... COMMENT` (só metadado) em toda execução.
+6. Garante a tabela no Unity Catalog (`CREATE TABLE ... LOCATION` só se ela não existir, nunca `DROP`) e aplica `COMMENT ON TABLE`/`ALTER COLUMN ... COMMENT` (só metadado) apenas no que mudou, inclusive em run sem arquivo novo.
 7. Grava o controle de execução em `{caminho_s3_bronze}/_control/{tabela}/{run_id}.json`.
 
 Se não há arquivo novo (ex.: 2ª execução no mesmo dia - a Stage pula a
-escrita porque o nome do arquivo já carrega a data da execução), a run fecha como `SUCCESS` sem escrever nada -
+escrita porque o nome do arquivo já carrega a data da execução), a run fecha como `SUCCESS` sem gravar dados (só o JSON de controle) -
 idempotência por identidade de arquivo, não por `SELECT DISTINCT` em dado de
 negócio.
 

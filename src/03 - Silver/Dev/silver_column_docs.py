@@ -18,7 +18,7 @@ COLUNAS_COMUNS = {
     "DESC_URL_ORIGEM": "Nome lógico da tabela de origem na Stage (ex.: 'cards'), não a URL da API.",
     "DESC_ARQUIVO_ORIGEM": "Caminho do arquivo Parquet de origem na Stage - usado só para auditoria/rastreabilidade.",
     "ID_EXECUCAO_BRONZE": "Id da execução da Bronze que originou esta linha - usado só para auditoria/rastreabilidade.",
-    "DT_INGESTAO_BRONZE": "Data/hora em que a Bronze processou o registro - usado só para auditoria/rastreabilidade.",
+    "DT_INGESTAO_BRONZE": "Data/hora em que a Bronze processou o registro - rastreabilidade e corte da carga incremental da Silver (lê só a Bronze mais nova que o max desta coluna).",
 }
 
 TABELAS_SILVER = {

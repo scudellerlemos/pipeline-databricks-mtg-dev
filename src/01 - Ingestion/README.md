@@ -23,8 +23,8 @@ Os cinco notebooks usam exclusivamente a
 - **`cards.py`** e **`card_prices.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data)
   (`default_cards`, ambos) — 1 request pro índice + 1 download do `.jsonl.gz`
   inteiro, filtrado em memória. Sem paginação, sem 1 request por carta/coleção.
-- **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`),
-  sem paginação. Captura também `card_count`, `parent_set_code`, `block` e
+- **`sets.py`**: `GET /sets` — devolve o catálogo inteiro em 1 request (`has_more: false`);
+  o código segue `next_page` por precaução. Captura também `card_count`, `parent_set_code`, `block` e
   `icon_svg_uri` (campos nativos da Scryfall).
 - **`rulings.py`**: [Bulk Data](https://scryfall.com/docs/api/bulk-data) (`rulings`)
   — mesmo padrão de `cards.py`/`card_prices.py` (1 request pro índice + 1
@@ -91,7 +91,7 @@ com as tasks em paralelo.
 `ingestion_utils.py` concentra o que é comum aos notebooks (`%run ./ingestion_utils`):
 `obter_segredo`, `configurar_armazenamento_s3`, `obter_http_com_retentativa`, `salvar_em_parquet`,
 `obter_codigos_colecoes_scryfall_desde`, `iniciar_execucao`/`finalizar_execucao`, `executar_ingestao_stage`
-(padroniza o wrapper `iniciar_execucao` → `try`/ingest → `finalizar_execucao` repetido nos 6
+(padroniza o wrapper `iniciar_execucao` → `try`/ingest → `finalizar_execucao` repetido nos 5
 notebooks — cada um só chama `executar_ingestao_stage(nome_tabela, endpoint,
 funcao_ingestao, CAMINHO_S3_STAGE)` e monta seu próprio relatório com o DataFrame
 devolvido).
@@ -156,8 +156,8 @@ s3://{bucket}/{stage_prefix}/
 
 ## Idempotência e controle de execução
 
-- **Nome de arquivo determinístico** — se o arquivo já existe, a run
-  pula essa partição (`files_skipped`) em vez de sobrescrever. Os cinco notebooks
+- **Nome de arquivo determinístico** — se a pasta do arquivo já existe com `_SUCCESS`, a run
+  pula essa partição (`files_skipped`); pasta sem `_SUCCESS` (escrita interrompida) é regravada. Os cinco notebooks
   usam o mesmo esquema via `salvar_em_parquet()` (`nome_arquivo_parquet()`).
   `{YYYYMMDD}` é a data completa da execução; `{year}_{month}` é a partição -
   a data da execução, exceto em `sets` e `card_prices`, onde vem do
