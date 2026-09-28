@@ -114,7 +114,7 @@ def test_carta_dupla_face_usa_a_face_da_frente():
 
 
 def test_reversible_card_sem_type_line_e_oracle_id_na_raiz_usa_a_frente():
-    # type ou oracle_id nulo quebra o DQ da Gold (NME_TIPO_CARTA, ID_ORACLE).
+    # type ou oracle_id nulo aborta a Stage (colunas_obrigatorias de cards.py).
     face = {"type_line": "Legendary Creature — Elf", "oracle_id": "orc-1"}
     carta = {"name": "X // X", "layout": "reversible_card", "id": "rev-1", "card_faces": [face, dict(face)]}
 

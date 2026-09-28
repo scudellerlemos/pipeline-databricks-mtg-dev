@@ -25,7 +25,7 @@ from pyspark.sql.types import *
 # =============================================================================
 
 # Sem filtro temporal: migrations é o histórico de merge/delete de scryfall_id,
-# e Bronze/Silver podem precisar resolver IDs antigos.
+# e Silver/Gold podem precisar resolver IDs antigos.
 URL_API_SCRYFALL = obter_segredo("scryfall_api_url")
 CABECALHOS_SCRYFALL = {"User-Agent": "MTGPipeline/1.0"}
 MAX_TENTATIVAS = int(obter_segredo("max_retries", "3"))

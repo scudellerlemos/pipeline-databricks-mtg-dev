@@ -92,7 +92,7 @@ por curiosidade — sem duplicar dado.
 - Toda camada valida o schema antes de gravar: a Stage aborta se coluna
   obrigatória vier nula (`colunas_obrigatorias` no `salvar_em_parquet`); Bronze,
   Silver e Gold comparam o lote com a tabela e com o `*_column_docs`
-  (`validar_contrato_esquema`). Coluna nova passa; coluna removida ou tipo
+  (`validar_contrato_esquema`). Coluna nova passa se estiver documentada no `*_column_docs`; coluna removida ou tipo
   alterado só com `permitir_quebra_esquema=True`.
 
 **Consequências.** Toda camada é idempotente, o que viabiliza a [ADR-011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd)

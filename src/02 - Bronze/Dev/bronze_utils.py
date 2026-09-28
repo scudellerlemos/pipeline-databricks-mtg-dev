@@ -96,7 +96,7 @@ def obter_arquivos_ja_carregados(spark, caminho_delta):
 
 def validar_esquema_bronze(spark, caminho_delta, nome_completo_tabela, df_entrada,
                            comentarios_colunas=None, permitir_quebra_esquema=False):
-    """Coluna nova da Stage entra via mergeSchema; coluna removida ou com tipo
+    """Coluna nova da Stage (documentada no bronze_column_docs) entra via mergeSchema; coluna removida ou com tipo
     alterado aborta antes do append (senão viraria NULL nas linhas novas)."""
     try:
         campos_atuais = campos_do_esquema(spark.read.format("delta").load(caminho_delta).schema)

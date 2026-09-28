@@ -41,7 +41,7 @@ Os cinco notebooks usam exclusivamente a
   `metadata.set_code`/`metadata.collector_number` (flattenados em colunas
   `metadata_*`). Sem filtro
   temporal: cortar por data quebraria a rastreabilidade de IDs antigos que
-  Bronze/Silver podem precisar resolver, mesmo tratando de cartas antigas.
+  Silver/Gold podem precisar resolver, mesmo tratando de cartas antigas.
 
 **Todas as tabelas são snapshot**: cada run relê o catálogo inteiro da Scryfall
 (recortado por `years_back` onde se aplica) e decide o que gravar via idempotência
