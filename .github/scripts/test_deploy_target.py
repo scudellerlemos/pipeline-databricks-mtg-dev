@@ -118,7 +118,7 @@ def test_status_pausa_do_alvo_vence_o_yaml():
 
 
 def test_pipeline_sem_cluster_e_sem_git_nao_quebra():
-    # MTG_PIPELINE so tem run_job_task: nao tem job_clusters nem git_source.
+    # Job sintetico sem job_clusters nem git_source: aplicar_alvo nao pode quebrar.
     deploy = _deploy_com_ambiente(ALVO_PRD)
     job = deploy.aplicar_alvo({"name": "MTG_PIPELINE", "tasks": [{"task_key": "rodar_stage"}]})
 

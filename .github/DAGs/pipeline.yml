@@ -19,7 +19,7 @@ resources:
         pause_status: PAUSED
       tasks:
         - task_key: rodar_stage
-          # Unica task com retry: depende do Scryfall, onde erro transitorio (503)
+          # Retry so na Stage (vale pra todas as tasks dela ao embutir): depende do Scryfall, onde erro transitorio (503)
           # e comum. Nas outras camadas erro e bug ou DQ, retry nao ajuda.
           max_retries: 2
           min_retry_interval_millis: 300000

@@ -57,7 +57,7 @@ Todas as colunas a partir da Silver são em PT-BR, sem acento, 100% MAIÚSCULAS 
 | MES_INGESTAO | int | Mês derivado de DT_INGESTAO (partição física). | Não |
 
 ## 7. Chave Única
-`ID_CARTA` + `DT_INGESTAO`. A Bronze `card_prices` é append-only (uma cotação por impressão por coleta, sem MERGE/upsert), então o histórico já nasce na Bronze. A Silver preserva esse histórico: cada run acrescenta uma nova linha em vez de sobrescrever, e é assim que o histórico diário de preço se acumula.
+`ID_CARTA` + `DT_INGESTAO`. A Bronze `card_prices` é append-only (uma cotação por impressão por coleta, sem MERGE/upsert), então o histórico já nasce na Bronze. A Silver preserva esse histórico: cada run acrescenta uma nova linha em vez de sobrescrever, e é assim que o histórico mensal de preço se acumula.
 
 ## 8. Regras de Implementação
 - **Filtro temporal:** nenhum na Silver; a Stage já restringe a impressões com `releaseDate` >= 1º de janeiro de (ano atual − `years_back`, padrão 5) - não é o preço de todas as impressões.

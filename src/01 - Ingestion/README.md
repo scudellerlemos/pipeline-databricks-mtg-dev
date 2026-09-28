@@ -64,7 +64,7 @@ do pipeline, não limite da fonte.
 **Escopo fechado (decisão de produto, 09/2026):**
 
 - **Frequência mensal**, inclusive para preço - 1 ponto por impressão por mês.
-- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção. Fica de fora
+- **Janela de 5 anos** (`years_back`) por data de lançamento da coleção (sets/cards) ou da impressão (card_prices). Fica de fora
   ~43% das cartas (as sem impressão na janela) e as impressões antigas das cartas que
   estão dentro - de propósito.
 

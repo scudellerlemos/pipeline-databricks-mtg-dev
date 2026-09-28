@@ -1,6 +1,6 @@
 name: Promover tag para produção
 
-# Merge na main = producao. Quando o CI da main termina verde, copia o codigo
+# Merge na main que dispara o CI = producao. Quando o CI da main termina verde, copia o codigo
 # desse commit pro repo pipeline-databricks-mtg-prd, cria a tag prd-<data>-<sha>
 # (usada no rollback) e dispara o deploy de la.
 # O PAT precisa de "Contents" e "Workflows" com escrita no -prd.
@@ -70,7 +70,7 @@ jobs:
 
           > **Repositório de produção** (catálogo `mtg_prod`). Snapshot publicado
           > automaticamente de [`pipeline-databricks-mtg-dev`](https://github.com/scudellerlemos/pipeline-databricks-mtg-dev)
-          > a cada merge na `main` de lá. Não edite aqui: mudanças entram por PR em dev.
+          > a cada merge na `main` de lá que dispara o CI. Não edite aqui: mudanças entram por PR em dev.
           AVISO
           cd .prd
           git config user.name "github-actions[bot]"
