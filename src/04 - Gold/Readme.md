@@ -1,6 +1,6 @@
 # Camada Gold
 
-`TB_FATO_MERCADO_CARTAS` - visão de mercado de cartas de Magic: The Gathering pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver. Tabela: preços da Silver x `TB_DIM_CARTAS` (atributos atuais da carta). As duas são recalculadas e gravadas com overwrite a cada run. Ver [ADR-013](../../docs/ADR.md#adr-013--gold-recalculada-com-overwrite).
+`TB_FATO_MERCADO_CARTAS` - visão de mercado de cartas de Magic: The Gathering pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver. Tabela: preços da Silver x `TB_DIM_CARTAS` (atributos atuais da carta). A dimensão é regravada com overwrite; a fato é incremental (cotações novas + histórico das cartas que mudaram na dimensão), com `rebuild=true` para recalcular tudo. Ver [ADR-013](../../docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão).
 
 - **Script:** `Dev/TB_FATO_MERCADO_CARTAS.py`
 - **Utilitários:** `Dev/gold_utils.py` (config/extract/load/auditoria, mesmo padrão de `silver_utils.py`)

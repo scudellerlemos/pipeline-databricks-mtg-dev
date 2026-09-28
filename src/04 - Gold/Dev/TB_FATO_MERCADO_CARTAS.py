@@ -4,14 +4,21 @@
 # =============================================================================
 """
 Constrói TB_FATO_MERCADO_CARTAS, visão única de consumo (analista/BI/Genie)
-sobre mercado de cartas, montada a partir da Silver. Duas tabelas, ambas
-recalculadas inteiras e gravadas com overwrite a cada run:
+sobre mercado de cartas, montada a partir da Silver. Duas tabelas:
 
 - gold.TB_DIM_CARTAS: 1 linha por ID_CARTA com os atributos atuais
-  (catálogo, coleção, rulings, migração).
+  (catálogo, coleção, rulings, migração). Overwrite a cada run (~tamanho do
+  catálogo, não cresce com o histórico).
 - gold.TB_FATO_MERCADO_CARTAS: silver.TB_FATO_PRECOS_CARTAS x TB_DIM_CARTAS.
-  Overwrite em vez de MERGE: migração de id e ruling novo valem para
-  cotações antigas, e o que sai da Silver sai da Gold.
+  Incremental: MERGE só com (a) cotações depois da última da Gold e (b) todo
+  o histórico das cartas cujo atributo mudou na dimensão (EXCEPT contra a
+  versão anterior dela, via time travel). Assim migração de id e ruling
+  novo chegam às cotações antigas sem recalcular tudo.
+
+Carga completa (overwrite das duas) quando: fato ou dimensão ainda não
+existem, a dimensão mudou de colunas, ou widget rebuild=true. O incremental
+não apaga: cotação removida da Silver (correção manual) só sai da Gold com
+rebuild=true.
 
 GRÃO da fato: uma linha por cotação de preço de uma impressão de carta.
 Chave: (ID_CARTA, DT_COTACAO), única por construção: PK da Silver de preços
@@ -168,7 +175,7 @@ def transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos
     """)
 
 
-def consulta_fato_mercado(catalogo):
+def consulta_fato_mercado(catalogo, filtro=""):
     """SELECT de TB_FATO_MERCADO_CARTAS: preços da Silver x TB_DIM_CARTAS já gravada."""
     return f"""
         SELECT
@@ -199,6 +206,7 @@ def consulta_fato_mercado(catalogo):
             p.MES_INGESTAO AS MES_COTACAO
         FROM {catalogo}.silver.TB_FATO_PRECOS_CARTAS p
         INNER JOIN {catalogo}.gold.TB_DIM_CARTAS d ON p.ID_CARTA = d.ID_CARTA
+        {filtro}
     """
 
 
@@ -207,6 +215,9 @@ def consulta_fato_mercado(catalogo):
 # =============================================================================
 config = criar_config_manual(obter_segredo("catalog_name"), obter_segredo("s3_bucket"))
 configurar_unity_catalog(config['catalog_name'], config['schema_gold'])
+
+# rebuild=true: recalcula a fato inteira (ex.: depois de apagar dado da Silver).
+dbutils.widgets.text("rebuild", "false")
 
 # COMMAND ----------
 
@@ -221,6 +232,7 @@ dq_resultados = {}
 qtd_lidos = 0
 qtd_processados = 0
 nome_completo_tabela = f"{config['catalog_name']}.{config['schema_gold']}.TB_FATO_MERCADO_CARTAS"
+nome_dim = f"{config['catalog_name']}.{config['schema_gold']}.TB_DIM_CARTAS"
 processador = GoldTableProcessor("TB_DIM_CARTAS", config)
 processador_fato = GoldTableProcessor("TB_FATO_MERCADO_CARTAS", config)
 
@@ -239,6 +251,21 @@ try:
     # cache: checagem de duplicata e escrita reusam o join.
     df_dim = transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes).cache()
 
+    incremental = (
+        dbutils.widgets.get("rebuild").lower() != "true"
+        and spark.catalog.tableExists(nome_completo_tabela)
+        and spark.catalog.tableExists(nome_dim)
+        and spark.table(nome_dim).columns == df_dim.columns
+    )
+    corte = spark.table(nome_completo_tabela).agg({"DT_COTACAO": "max"}).first()[0] if incremental else None
+    incremental = corte is not None
+    if incremental:
+        # Lido antes do overwrite: é a versão contra a qual a dimensão nova é comparada.
+        versao_dim_anterior = spark.sql(f"DESCRIBE HISTORY {nome_dim} LIMIT 1").first()["version"]
+        print(f"Incremental: cotações depois de {corte} + cartas que mudaram desde a versão {versao_dim_anterior} de TB_DIM_CARTAS")
+    else:
+        print("Carga completa de TB_FATO_MERCADO_CARTAS")
+
     try:
         processador.salvar_tabela_gold(
             df_dim,
@@ -247,15 +274,34 @@ try:
             comentarios_colunas=obter_comentarios_colunas("TB_DIM_CARTAS")
         )
 
+        if incremental:
+            spark.sql(f"""
+                CREATE OR REPLACE TEMP VIEW _cartas_mudaram AS
+                SELECT DISTINCT ID_CARTA FROM (
+                    SELECT * FROM {nome_dim}
+                    EXCEPT
+                    SELECT * FROM {nome_dim} VERSION AS OF {versao_dim_anterior}
+                )
+            """)
+            print(f"Cartas novas ou com atributo alterado: {spark.table('_cartas_mudaram').count()}")
+            consulta = consulta_fato_mercado(
+                config['catalog_name'],
+                "WHERE p.DT_INGESTAO > :corte OR p.ID_CARTA IN (SELECT ID_CARTA FROM _cartas_mudaram)",
+            )
+            df_fato = spark.sql(consulta, args={"corte": corte})
+        else:
+            df_fato = spark.sql(consulta_fato_mercado(config['catalog_name']))
+
         # cache: count, checagem de duplicata e escrita reusam o join.
-        df_fato = spark.sql(consulta_fato_mercado(config['catalog_name'])).cache()
+        df_fato = df_fato.cache()
         qtd_processados = df_fato.count()
         processador_fato.salvar_tabela_gold(
             df_fato,
             colunas_particao=["ANO_COTACAO", "MES_COTACAO"],
             coluna_chave=["ID_CARTA", "DT_COTACAO"],
             comentario_tabela=obter_comentario_tabela("TB_FATO_MERCADO_CARTAS"),
-            comentarios_colunas=obter_comentarios_colunas("TB_FATO_MERCADO_CARTAS")
+            comentarios_colunas=obter_comentarios_colunas("TB_FATO_MERCADO_CARTAS"),
+            incremental=incremental
         )
     except RuntimeError:
         status_auditoria = "FALHA_DQ_PK"

@@ -23,7 +23,7 @@ Visão única de mercado de cartas de Magic: The Gathering - combina catálogo d
 - `ID_CARTA_CANONICO` nunca é NULO - cai no próprio `ID_CARTA` quando não há migração.
 
 ## 6. Carga
-`TB_DIM_CARTAS` e esta tabela são recalculadas inteiras da Silver e gravadas com `overwrite` a cada execução (chave duplicada no lote aborta antes de gravar). Sem MERGE: o que sai da Silver sai da Gold, e atributo novo da carta (migração, ruling) vale para cotações antigas. Particionada por `ANO_COTACAO`/`MES_COTACAO`.
+`TB_DIM_CARTAS` é recalculada e gravada com `overwrite` a cada execução. Esta tabela é incremental: MERGE só com as cotações posteriores à última `DT_COTACAO` gravada e com todo o histórico das cartas que mudaram em `TB_DIM_CARTAS` (atributo novo, como migração ou ruling, vale para cotações antigas). Chave duplicada no lote aborta antes de gravar. Carga completa (`overwrite`) na primeira execução, se a dimensão mudar de colunas ou com o widget `rebuild=true` — único jeito de tirar da Gold uma cotação apagada da Silver. Particionada por `ANO_COTACAO`/`MES_COTACAO`.
 
 ## 7. Data Quality e Auditoria
 Abortam a run: PK (desta tabela ou de `TB_DIM_CARTAS`) com chave NULA ou duplicada (no lote, antes de gravar; ou já gravada na tabela), `ID_ORACLE` nulo, valor negativo de preço e nulo residual em coluna categórica (limite 0); no pré-join, preços sem carta acima de 12000. Só informativos: coleção não encontrada, cartas sem cotação e ids migrados. 1 linha de auditoria em `TB_AUDITORIA_GOLD` (run id, início/fim, duração, contagens, resultado de DQ, status) por execução, inclusive as abortadas (gravada num `finally`): `SUCESSO`, `FALHA_DQ` (DQ pré-join ou pós-carga), `FALHA_DQ_PK` (validação de PK) ou `FALHA` (erro inesperado).
@@ -33,4 +33,4 @@ Abortam a run: PK (desta tabela ou de `TB_DIM_CARTAS`) com chave NULA ou duplica
 |---|---|---|
 | 2026-09-15 | Felipe | Criação - substitui as 3 tabelas Gold antigas (schema pré-DAMA, colunas em inglês) por uma única tabela Gold sobre o schema Silver atual |
 | 2026-09-15 | Felipe | Adiciona `TB_MOV_MIGRACOES_CARTAS` (LEFT JOIN agregado) e as colunas `ID_CARTA_CANONICO`/`FLG_ID_CARTA_MIGRADO`, pra resolver id de carta migrado/descontinuado direto na Gold |
-| 2026-09-27 | Felipe | Passa a ser montada a partir de `TB_DIM_CARTAS` e gravada com overwrite em vez de MERGE (ADR-013): sem linha órfã |
+| 2026-09-27 | Felipe | Passa a ser montada a partir de `TB_DIM_CARTAS` e carga incremental que propaga mudança da dimensão ao histórico (ADR-013); `rebuild=true` recalcula tudo |

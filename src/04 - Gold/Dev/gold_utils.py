@@ -139,13 +139,15 @@ def _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, co
 # ============================================================================
 def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
                    colunas_particao=None, coluna_chave=None,
-                   comentario_tabela=None, comentarios_colunas=None, permitir_quebra_esquema=False):
+                   comentario_tabela=None, comentarios_colunas=None, permitir_quebra_esquema=False,
+                   incremental=False):
     """
-    LOAD: grava df_final na camada Gold (Delta + Unity Catalog) com overwrite.
+    LOAD: grava df_final na camada Gold (Delta + Unity Catalog).
 
-    Toda tabela Gold é recalculada inteira da Silver a cada run. Overwrite em
-    vez de MERGE: o que sai da Silver sai da Gold. Lote com chave duplicada
-    aborta antes de gravar.
+    Overwrite por padrão (tabela recalculada inteira: o que sai da Silver sai
+    da Gold). incremental=True com a tabela já existente faz MERGE por
+    coluna_chave: df_final é só o que entrou ou mudou. Lote com chave
+    duplicada aborta antes de gravar.
 
     Args:
         df_final (DataFrame): DataFrame final para salvar
@@ -160,6 +162,7 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
             que ter exatamente essas colunas.
         permitir_quebra_esquema (bool): True só para remover coluna ou mudar
             tipo de propósito. Sem isso, o contrato aborta antes de gravar.
+        incremental (bool): MERGE em vez de overwrite (exige coluna_chave).
     """
     if not caminho_s3_gold.startswith("s3://"):
         caminho_s3_gold = f"s3://{caminho_s3_gold}"
@@ -191,12 +194,25 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         permitir_quebra=permitir_quebra_esquema,
     )
 
-    # mergeSchema: coluna nova (já validada pelo contrato) entra; NOT NULL e PK
-    # da tabela ficam. overwriteSchema trocaria o schema e derrubaria o NOT NULL.
-    escritor = df_final.write.format("delta").mode("overwrite").option("mergeSchema", "true")
-    if colunas_particao:
-        escritor = escritor.partitionBy(*colunas_particao)
-    escritor.save(caminho_delta)
+    fazer_merge = incremental and arquivos_existem
+    if fazer_merge:
+        # <=> (null-safe): com "=", chave nula nunca casa e seria reinserida a cada run.
+        condicao_merge = " AND ".join(f"gold.{k} <=> novo.{k}" for k in colunas_chave)
+        (
+            DeltaTable.forPath(sessao_spark, caminho_delta).alias("gold")
+            .merge(df_final.alias("novo"), condicao_merge)
+            .withSchemaEvolution()
+            .whenMatchedUpdateAll()
+            .whenNotMatchedInsertAll()
+            .execute()
+        )
+    else:
+        # mergeSchema: coluna nova (já validada pelo contrato) entra; NOT NULL e PK
+        # da tabela ficam. overwriteSchema trocaria o schema e derrubaria o NOT NULL.
+        escritor = df_final.write.format("delta").mode("overwrite").option("mergeSchema", "true")
+        if colunas_particao:
+            escritor = escritor.partitionBy(*colunas_particao)
+        escritor.save(caminho_delta)
 
     sessao_spark.sql(
         f"CREATE TABLE IF NOT EXISTS {nome_completo_tabela} USING DELTA LOCATION '{caminho_delta}'"
@@ -209,7 +225,9 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
 
     aplicar_documentacao_tabela(sessao_spark, nome_completo_tabela, comentario_final_tabela, comentarios_colunas)
 
-    if colunas_chave:
+    # No MERGE a PK já foi declarada na carga completa e o lote foi checado
+    # acima; revalidar varreria a tabela inteira a cada run.
+    if colunas_chave and not fazer_merge:
         _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, colunas_chave)
 
     print("Dados salvos com sucesso na camada Gold!")
@@ -347,7 +365,7 @@ class GoldTableProcessor:
 
     def salvar_tabela_gold(self, df, colunas_particao=None, coluna_chave=None,
                            comentario_tabela=None, comentarios_colunas=None,
-                           permitir_quebra_esquema=False):
+                           permitir_quebra_esquema=False, incremental=False):
         """Salva tabela na Gold com configurações padrão"""
         salvar_na_gold(
             df_final=df,
@@ -359,7 +377,8 @@ class GoldTableProcessor:
             coluna_chave=coluna_chave,
             comentario_tabela=comentario_tabela,
             comentarios_colunas=comentarios_colunas,
-            permitir_quebra_esquema=permitir_quebra_esquema
+            permitir_quebra_esquema=permitir_quebra_esquema,
+            incremental=incremental
         )
 
         print(f"{self.nome_tabela} criada com sucesso!")
