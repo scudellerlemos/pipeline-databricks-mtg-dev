@@ -164,7 +164,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     test_buscar_cartas_por_colecoes_filtra_por_colecao_e_mapeia_campos()
     test_carta_dupla_face_usa_a_face_da_frente()
-    test_reversible_card_sem_type_line_na_raiz_usa_a_frente()
+    test_reversible_card_sem_type_line_e_oracle_id_na_raiz_usa_a_frente()
     test_carta_dupla_face_cores_vazias_nao_contam_como_ausentes()
     test_legalidades_viram_json_valido()
     test_campos_legados_sem_equivalente_ficam_none()
