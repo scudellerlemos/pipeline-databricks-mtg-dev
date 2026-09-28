@@ -55,7 +55,7 @@ except NameError:
 # ============================================================================
 def criar_config_manual(catalogo, bucket_s3, prefixo_s3_gold=None):
     """
-    Cria configuração manual sem usar secrets (para testes/desenvolvimento)
+    Monta a config da Gold a partir do catálogo e do bucket informados; o prefixo vem de obter_segredo.
 
     Example:
         config = criar_config_manual("meu_catalog", "s3://meu-bucket")

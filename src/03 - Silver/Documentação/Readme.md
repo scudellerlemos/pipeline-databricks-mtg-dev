@@ -81,7 +81,7 @@ Todas as colunas a partir da Silver são em PT-BR, sem acento, 100% MAIÚSCULAS 
 - **ANO_/MES_**: Colunas derivadas usadas só como `colunas_particao`
 
 ### Regra "sem `( ) { }` no dado Silver"
-Todo texto livre/estrutura serializada da fonte converte `{...}`/`(...)` para `[...]` na Silver, sem exceção por tabela - presença de parêntese/chave no dado Silver indica transformação incompleta.
+As colunas `DESC_` de texto livre/estrutura serializada tratadas em cada notebook convertem `{...}`/`(...)` para `[...]` - presença de parêntese/chave no dado Silver indica transformação incompleta.
 
 ## Como Usar Esta Documentação
 

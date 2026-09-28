@@ -72,7 +72,7 @@ do pipeline, não limite da fonte.
 
 | Notebook | Fonte | Grão | Observação |
 |---|---|---|---|
-| `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `codigos_colecoes` dentro da janela `years_back` (via `sets`) |
+| `cards.py` | `bulk-data/default_cards` | 1 linha por impressão (set+número) | Filtra por `codigos_colecoes` dentro da janela `years_back` (códigos do endpoint `/sets`, independente de `sets.py`) |
 | `sets.py` | `GET /sets` | 1 linha por coleção | Filtra por `releaseDate >= cutoff` |
 | `card_prices.py` | `bulk-data/default_cards` | 1 linha por impressão (`id`) | Filtra por `releaseDate >= cutoff`, independente de `cards.py` |
 | `rulings.py` | `bulk-data/rulings` | 1 linha por ruling (referenciada por `oracle_id`) | Sem filtro temporal, catálogo inteiro (~79k linhas) |
@@ -129,7 +129,7 @@ scryfall_api_url     # URL base da Scryfall API
 s3_bucket             # Bucket S3
 s3_stage_prefix       # Prefixo do staging (padrão: "stage")
 years_back            # Janela temporal em anos (padrão: 5)
-max_retries           # Tentativas de retry por request HTTP (padrão: 3)
+max_retries           # Tentativas totais por request HTTP (padrão: 3 = 1 + 2 retries)
 ```
 
 ## Estrutura no S3
