@@ -62,7 +62,7 @@ Todas as colunas a partir da Silver são em PT-BR, sem acento, 100% MAIÚSCULAS,
 - **Filtro temporal:** não aplicado (histórico de migração é útil por completo).
 - **Merge incremental:** por `ID_MIGRACAO`, desempate por `DT_INGESTAO` mais recente.
 - **Particionamento:** por `ANO_EXECUCAO` e `MES_EXECUCAO`.
-- **Resolução de cadeia (`ID_CARTA_CANONICO`):** segue a cadeia de unificações em Python puro (`_resolver_cadeia_ids`, máx. 10 saltos, seguro contra ciclo) a partir das migrações com `NME_ESTRATEGIA_MIGRACAO = 'Unificacao'` e `ID_CARTA_NOVO` preenchido - testado isoladamente em `test_migration_chain.py`.
+- **Resolução de cadeia (`ID_CARTA_CANONICO`):** lê a Bronze inteira a cada run (não incremental), para a cadeia e as linhas antigas refletirem migração nova; segue a cadeia de unificações em Python puro (`_resolver_cadeia_ids`, máx. 10 saltos, seguro contra ciclo) a partir das migrações com `NME_ESTRATEGIA_MIGRACAO = 'Unificacao'` e `ID_CARTA_NOVO` preenchido - testado isoladamente em `test_migration_chain.py`.
 - **Regra "sem `( ) { }` no dado Silver":** `DESC_NOTA` converte `{...}`/`(...)` para `[...]`, mesma regra de `TB_FATO_CARTAS`.
 
 ## 9. Histórico de Alterações

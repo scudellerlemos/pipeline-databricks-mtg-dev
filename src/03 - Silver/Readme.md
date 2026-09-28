@@ -40,6 +40,8 @@ spark.sql(r"""
 ```
 
 ### Load - Carregamento na Silver
+Extract incremental: com a tabela Silver já existente, lê só a Bronze com `bronze_ingestion_timestamp` > `max(DT_INGESTAO_BRONZE)`; sem ela, lê a Bronze inteira (`extrair_da_bronze`). `TB_MOV_MIGRACOES_CARTAS` sempre lê a Bronze inteira (a cadeia de ids precisa de todas as migrações). A transformação fica em cache para o MERGE e o count.
+
 A primeira carga (Delta inexistente) é `overwrite`. As seguintes usam o merge builder do Delta (`DeltaTable.merge()` com `withSchemaEvolution()`), condição nula-segura `silver.<chave> <=> novo.<chave>` (`salvar_na_silver` em `silver_utils.py`):
 ```python
 (
@@ -118,7 +120,6 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 ## Controle de Qualidade
 
 ### Validações Implementadas
-- **Verificação de DataFrame nulo** (None; DataFrame vazio não é bloqueado)
 - **Remoção de duplicatas**
 - **Compatibilidade de schema**
 - **Merge incremental**
@@ -132,7 +133,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 
 ### Logs e Monitoramento
 - **Contagem de registros**: Antes e depois do processamento
-- **Schema**: diferença de colunas entre origem e destino é avisada no log
+- **Schema**: coluna nova é logada; coluna removida, tipo alterado ou coluna fora do `silver_column_docs` aborta antes de gravar (`permitir_quebra_esquema=True` libera remoção/tipo, não a divergência com o column_docs)
 
 ## Características dos Dados
 
@@ -224,7 +225,7 @@ condicao_merge = " AND ".join(f"silver.{k} <=> novo.{k}" for k in colunas_chave)
 
 #### Regra #3: Compatibilidade de Schema
 ```python
-# Diferença de schema só é logada; coluna nova entra pelo merge
+# Contrato de schema valida antes (remoção, tipo ou coluna não documentada abortam); coluna nova entra pelo merge
 .merge(df_final.alias("novo"), condicao_merge).withSchemaEvolution()
 ```
 

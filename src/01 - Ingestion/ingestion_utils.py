@@ -6,7 +6,7 @@
 Uso no notebook (Databricks):
     %run ./ingestion_utils
 
-Código compartilhado pelos 6 notebooks da Stage: coleta da API Scryfall,
+Código compartilhado pelos 5 notebooks da Stage: coleta da API Scryfall,
 gravação em Parquet no S3 e controle de execução. Sem CDC (a API não tem
 captura de alteração) e sem regra de negócio - isso fica na Bronze/Silver.
 """
@@ -317,7 +317,7 @@ def finalizar_execucao(execucao, caminho_base, status, erro=None):
 
 def executar_ingestao_stage(nome_tabela, endpoint, funcao_ingestao, caminho_base, parametros=None):
     """
-    Roda iniciar_execucao -> funcao_ingestao(execucao) -> finalizar_execucao, usado pelos 6 notebooks da Stage.
+    Roda iniciar_execucao -> funcao_ingestao(execucao) -> finalizar_execucao, usado pelos 5 notebooks da Stage.
 
     funcao_ingestao deve devolver o DataFrame gravado; None levanta exceção para o
     job falhar. Devolve (df, execucao).
