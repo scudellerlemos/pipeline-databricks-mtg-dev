@@ -215,13 +215,13 @@ Precedência: env var `MTG_<NOME>` > secret > default; prd injeta
 1. **Ingestão**: `src/01 - Ingestion/` (extração da API)
 2. **Bronze**: `src/02 - Bronze/` (carregamento de dados brutos)
 3. **Silver**: `src/03 - Silver/` (transformação e limpeza)
-4. **Gold**: `src/04 - Gold/` (tabela de mercado)
+4. **Gold**: `src/04 - Gold/` (TB_DIM_CARTAS + fato de mercado)
 
 
 ## Próximos Passos
 
 ### Expansão Imediata
-- Camada Gold com múltiplas tabelas (Star Schema completo, hoje é 1 tabela larga)
+- Camada Gold com múltiplas tabelas (Star Schema completo, hoje é 1 fato larga + TB_DIM_CARTAS)
 - Análises por formato de jogo (Standard, Modern, Commander)
 
 ### Melhorias Futuras
