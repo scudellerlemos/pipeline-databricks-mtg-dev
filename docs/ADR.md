@@ -64,7 +64,7 @@ catálogo inteiro. Preço muda diariamente, mas a análise é de tendência.
 vêm do `releaseDate` e há uma janela de anos sobre ele; nas demais, da própria
 execução.
 
-**Consequências.** Stage simples, sem estado de "até onde já li" (Bronze, Silver e Gold leem incremental a partir da camada anterior). O histórico
+**Consequências.** Stage simples, sem estado de "até onde já li" (Bronze e Silver leem incremental a partir da camada anterior, exceto migrações; a Gold relê a Silver e grava a fato incremental). O histórico
 de preço tem uma coleta por execução agendada (mensal) — mais nas publicações
 com código novo
 ([ADR-011](#adr-011--publicação-com-código-novo-roda-o-pipeline-de-prd)).

@@ -57,7 +57,7 @@ Antes do merge há dedup por chave: `row_number()` (ordem por `coluna_ordenacao`
 
 ## Estrutura dos Notebooks
 
-São 5 notebooks, orquestrados por `.github/DAGs/silver.yml` (detalhe de cada tabela em [`Documentação/Readme.md`](./Documentação/Readme.md)):
+São 5 notebooks, tasks do job MTG_SILVER (`.github/DAGs/silver.yml`, embutidas no MTG_PIPELINE) (detalhe de cada tabela em [`Documentação/Readme.md`](./Documentação/Readme.md)):
 
 | Notebook | Chave | `coluna_ordenacao` (dedup) | Partição |
 |---|---|---|---|
@@ -149,7 +149,7 @@ Com `MTG_ENVIRONMENT=production`, resolver o catálogo para `mtg_dev` é bloquea
 - **Filtro**: nenhum na Silver (não depende de `TB_FATO_CARTAS`); a Stage já restringe a impressões com `releaseDate` >= 1º de janeiro de (ano atual − `years_back`, padrão 5)
 - **Merge**: Incremental por `ID_CARTA` + `DT_INGESTAO`
 - **Particionamento**: `ANO_INGESTAO`/`MES_INGESTAO`
-- **Frequência**: Atualização frequente (preços dinâmicos)
+- **Frequência**: Mensal (1 coleta por mês)
 - **Fonte**: Scryfall (todas as tabelas da Silver vêm da Scryfall)
 - **Tipo**: Market Data (dados dinâmicos)
 
