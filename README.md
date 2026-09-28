@@ -244,6 +244,7 @@ mesmo bloco, e dev e prd usam o mesmo cluster:
 spark_version: "15.4.x-scala2.12"
 node_type_id: "m5d.2xlarge"   # 8 vCPU / 32 GB
 num_workers: 0                # single-node: tudo roda no driver
+data_security_mode: "SINGLE_USER"  # obrigatorio: sem ele o single-node fica sem Unity Catalog
 aws_attributes:
   availability: "ON_DEMAND"
   zone_id: "us-west-2a"
