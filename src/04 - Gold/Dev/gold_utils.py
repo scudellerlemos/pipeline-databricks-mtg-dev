@@ -138,6 +138,20 @@ def _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, co
 # ============================================================================
 # FUNÇÃO DE CARREGAMENTO DELTA/UNITY CATALOG
 # ============================================================================
+def montar_condicao_update(colunas_lote, colunas_chave, campos_atuais):
+    """Condição do whenMatchedUpdate: só atualiza linha com algum valor diferente.
+
+    O lote é recalculado inteiro a cada run e toda chave casa; sem condição o
+    MERGE regrava todos os arquivos da tabela. Coluna nova no lote -> None
+    (atualiza tudo) para preencher o histórico.
+    """
+    if not set(colunas_lote) <= set(campos_atuais):
+        return None
+    return " OR ".join(
+        f"NOT (gold.{c} <=> novo.{c})" for c in colunas_lote if c not in colunas_chave
+    ) or None
+
+
 def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
                    colunas_particao=None, coluna_chave=None,
                    comentario_tabela=None, comentarios_colunas=None, permitir_quebra_esquema=False):
@@ -204,6 +218,7 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
 
         # <=> (null-safe): com "=", chave nula nunca casa e seria reinserida a cada run.
         condicao_merge = " AND ".join(f"gold.{k} <=> novo.{k}" for k in colunas_chave)
+        condicao_update = montar_condicao_update(df_final.columns, colunas_chave, campos_atuais)
 
         # withSchemaEvolution(): coluna nova entra sem migração. Exige Delta 3.1+ (DBR 15.2+).
         tabela_delta = DeltaTable.forPath(sessao_spark, caminho_delta)
@@ -211,7 +226,7 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
             tabela_delta.alias("gold")
             .merge(df_final.alias("novo"), condicao_merge)
             .withSchemaEvolution()
-            .whenMatchedUpdateAll()
+            .whenMatchedUpdateAll(condition=condicao_update)
             .whenNotMatchedInsertAll()
             .execute()
         )
