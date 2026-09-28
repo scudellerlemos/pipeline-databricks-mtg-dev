@@ -82,8 +82,8 @@ ESQUEMA_COLECOES = StructType(
 
 # Campos legados da magicthegathering.io sem equivalente na Scryfall: sempre
 # None (`source` é preenchido com 'scryfall' pelo salvar_em_parquet). Ficam no
-# schema porque a Silver (TB_DIM_COLECOES) lê essas colunas (ver README -
-# "Imutabilidade").
+# schema porque a Silver (TB_DIM_COLECOES) lê essas colunas, menos `booster`,
+# que fica só pelo schema imutável (ver README - "Imutabilidade").
 _CAMPOS_SEM_EQUIVALENTE_SCRYFALL = (
     'border', 'mkm_id', 'mkm_name', 'gathererCode', 'magicCardsInfoCode',
     'oldCode', 'source', 'booster',

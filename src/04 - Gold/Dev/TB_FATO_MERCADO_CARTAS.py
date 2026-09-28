@@ -53,7 +53,8 @@ REGRA DE NULO:
 - Preços nulos continuam nulos (0 não significa "sem cotação").
 - QTD_ESCLARECIMENTOS nulo -> 0 (carta nunca teve ruling).
 - Datas nulas -> sentinela 1001-01-01.
-- PK nunca é mascarada: nulo faz a run falhar em _declarar_chave_primaria.
+- PK nunca é mascarada: nulo faz a run falhar em _declarar_chave_primaria
+  (carga completa) ou na constraint NOT NULL (MERGE).
 - ID_CARTA_CANONICO sem migração -> o próprio ID_CARTA.
 """
 
@@ -309,7 +310,7 @@ try:
         # ID_ORACLE vem da Silver sem COALESCE; nenhum nulo é tolerado.
         "fk_null_id_oracle": f"SELECT COUNT(*) FROM {nome_completo_tabela} WHERE ID_ORACLE IS NULL",
 
-        # Categóricos nunca são nulos (COALESCE aqui ou 'NA' na Silver).
+        # Categóricos nunca são nulos (COALESCE aqui, 'NA' na Silver ou colunas_obrigatorias da Stage).
         "null_residual_categorico": f"""SELECT COUNT(*) FROM {nome_completo_tabela}
             WHERE NME_CARTA IS NULL OR NME_TIPO_CARTA IS NULL OR NME_RARIDADE IS NULL
                OR NME_CATEGORIA_COR IS NULL OR COD_CORES IS NULL

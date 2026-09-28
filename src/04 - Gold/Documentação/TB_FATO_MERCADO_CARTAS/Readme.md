@@ -19,7 +19,7 @@ Visão única de mercado de cartas de Magic: The Gathering - combina catálogo d
 - Medida (`VLR_USD`/`VLR_USD_FOIL`/`VLR_USD_ETCHED`/`VLR_EUR`/`VLR_EUR_FOIL`/`VLR_TIX`) NULA continua NULA - 0 não é "sem cotação".
 - `QTD_ESCLARECIMENTOS` NULO -> 0 (zero é valor real).
 - Data NULA -> sentinela `1001-01-01`.
-- Chave (`ID_CARTA`, `DT_COTACAO`) nunca é mascarada - run falha (`RuntimeError`) se vier NULA.
+- Chave (`ID_CARTA`, `DT_COTACAO`) nunca é mascarada - run falha se vier NULA (`RuntimeError` na carga completa; constraint NOT NULL no MERGE).
 - `ID_CARTA_CANONICO` nunca é NULO - cai no próprio `ID_CARTA` quando não há migração.
 
 ## 6. Carga

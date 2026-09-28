@@ -170,7 +170,7 @@ tabela_delta.alias("silver").merge(df_final.alias("novo"), "silver.ID_CARTA <=> 
 ### Metadados das Tabelas
 - **`COMMENT ON TABLE`**: descrição de negócio + "Chave única: ..." (de `silver_column_docs.py`)
 - **`COMMENT` por coluna**: vindo de `silver_column_docs.py`
-- **`PRIMARY KEY`**: sempre declarada na chave; a run falha (RuntimeError) se a chave tiver NULO ou duplicata
+- **`PRIMARY KEY`**: sempre declarada na chave; a run falha se a chave tiver NULO ou duplicata (`RuntimeError` na primeira carga; depois, NULO é barrado pela constraint NOT NULL no MERGE)
 - Nenhuma `TBLPROPERTIES` customizada é gravada
 
 ### Particionamento das Tabelas

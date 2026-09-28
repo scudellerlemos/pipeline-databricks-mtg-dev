@@ -107,7 +107,7 @@ Todo texto livre/estrutura serializada da fonte converte `{...}`/`(...)` para `[
 
 ### Validações Implementadas
 - **Schema Padronizado**: Nomenclatura PT-BR consistente
-- **Chave Única Sinalizada**: `PRIMARY KEY` sempre declarada no Unity Catalog; a run falha (RuntimeError) se a chave tiver NULO ou duplicata
+- **Chave Única Sinalizada**: `PRIMARY KEY` sempre declarada no Unity Catalog; a run falha se a chave tiver NULO ou duplicata (`RuntimeError` na primeira carga; depois, NULO é barrado pela constraint NOT NULL no MERGE)
 - **Particionamento Adequado**: Otimização de performance
 - **Limpeza de Dados**: Sem `( ) { }` remanescente no dado Silver
 - **Merge Incremental**: Atualização idempotente pela chave única de cada tabela

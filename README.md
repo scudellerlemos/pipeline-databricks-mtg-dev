@@ -198,8 +198,8 @@ PR ──▶ CI ──▶ merge na main ──▶ CI + deploy dev ──▶ prom
 
 
 ### Entidades Principais
-- **Cartas**: catálogo completo via bulk-data
-- **Sets**: Todas as expansões
+- **Cartas**: bulk-data, filtrado pelas coleções da janela de `years_back` (padrão 5 anos)
+- **Sets**: expansões lançadas dentro da mesma janela
 - **Preços**: Histórico de preços (uma linha por coleta, sem dedup)
 - **Rulings**: Esclarecimentos oficiais de regras por carta
 - **Migrations**: Histórico de reconciliação de IDs de carta
