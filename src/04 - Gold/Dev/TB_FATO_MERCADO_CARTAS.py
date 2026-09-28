@@ -3,21 +3,30 @@
 # CAMADA GOLD - MERCADO DE CARTAS - MAGIC: THE GATHERING
 # =============================================================================
 """
-Constrói a tabela Gold TB_FATO_MERCADO_CARTAS: tabela única de consumo
-(analista/BI/Genie) sobre mercado de cartas, montada a partir da Silver.
+Constrói TB_FATO_MERCADO_CARTAS, visão única de consumo (analista/BI/Genie)
+sobre mercado de cartas, montada a partir da Silver. Duas peças:
 
-GRÃO: uma linha por cotação de preço de uma impressão de carta.
-Chave: (ID_CARTA, DT_COTACAO). Cresce ~1x TB_FATO_CARTAS por coleta.
-Esclarecimentos e migrações são agregados antes do join para não haver
-fan-out; chave duplicada faz o salvar_na_gold abortar antes de gravar.
+- gold.TB_DIM_CARTAS (tabela, overwrite): 1 linha por ID_CARTA com os
+  atributos atuais (catálogo, coleção, rulings, migração). Recalculada
+  inteira a cada run; tamanho de TB_FATO_CARTAS, não cresce com o histórico.
+- gold.TB_FATO_MERCADO_CARTAS (view): silver.TB_FATO_PRECOS_CARTAS x
+  TB_DIM_CARTAS. O histórico de preço não é copiado: a Silver já grava
+  incremental. Migração de id e ruling novo valem para cotações antigas, e o
+  que sai da Silver sai da Gold.
+
+GRÃO da view: uma linha por cotação de preço de uma impressão de carta.
+Chave: (ID_CARTA, DT_COTACAO), única por construção: PK da Silver de preços
+(ID_CARTA, DT_INGESTAO) x PK de TB_DIM_CARTAS (ID_CARTA). Esclarecimentos e
+migrações são agregados antes do join para não haver fan-out; chave
+duplicada na dimensão faz o salvar_na_gold abortar antes de gravar.
 
 VLR_USD/EUR/TIX são o preço daquela impressão (reimpressão e original são
 linhas distintas). _FOIL/_ETCHED são outra cotação da mesma impressão, por
 isso são colunas: SUM(VLR_USD) não inclui foil.
 
 TABELAS SILVER USADAS:
-- TB_FATO_CARTAS (driver): 1 linha por impressão.
-- TB_FATO_PRECOS_CARTAS (INNER JOIN por ID_CARTA): N cotações por impressão.
+- TB_FATO_CARTAS (driver da dimensão): 1 linha por impressão.
+- TB_FATO_PRECOS_CARTAS (INNER JOIN por ID_CARTA, na view): N cotações por impressão.
   INNER porque DT_COTACAO é parte da chave; cartas sem cotação ficam de fora
   (contadas no DQ pré-join).
 - TB_DIM_COLECOES (LEFT JOIN por COD_COLECAO): nome, bloco e data de
@@ -73,10 +82,11 @@ def configurar_logging():
     return logging.getLogger(__name__)
 
 
-def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes):
-    """Join das 5 tabelas Silver (ver docstring do notebook) via spark.sql sobre temp views."""
+def transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes):
+    """TB_DIM_CARTAS: cartas + coleção + rulings + migração, via spark.sql sobre
+    temp views. df_precos só entra no DQ pré-join."""
     logger = logging.getLogger(__name__)
-    logger.info("Iniciando join Gold - TB_FATO_MERCADO_CARTAS...")
+    logger.info("Iniciando join Gold - TB_DIM_CARTAS...")
 
     df_cartas.createOrReplaceTempView("_cartas")
     df_colecoes.createOrReplaceTempView("_colecoes")
@@ -84,7 +94,7 @@ def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclar
     df_esclarecimentos.createOrReplaceTempView("_esclarecimentos")
     df_migracoes.createOrReplaceTempView("_migracoes")
 
-    # DATA QUALITY (pré-join): conta o que o INNER JOIN descarta, antes de gravar nada.
+    # DATA QUALITY (pré-join): conta o que o INNER JOIN da view descarta, antes de gravar nada.
     executar_checagens_dq(spark, "pré-join", {
         # Carta sem cotação. Sempre > 0: carta nova chega antes do preço dela.
         "cartas_excluidas_sem_cotacao_de_preco": ("""
@@ -134,7 +144,7 @@ def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclar
         WHERE rn = 1
     """)
 
-    df_final = spark.sql("""
+    return spark.sql("""
         SELECT
             c.ID_CARTA,
             c.ID_ORACLE,
@@ -148,6 +158,35 @@ def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclar
             COALESCE(col.NME_COLECAO, 'Nao_Identificado') AS NME_COLECAO,
             COALESCE(col.NME_BLOCO, 'Nao_Identificado') AS NME_BLOCO,
             COALESCE(col.DT_LANCAMENTO, DATE'1001-01-01') AS DT_LANCAMENTO_COLECAO,
+            COALESCE(e.QTD_ESCLARECIMENTOS, 0) AS QTD_ESCLARECIMENTOS,
+            COALESCE(e.DT_ULTIMO_ESCLARECIMENTO, DATE'1001-01-01') AS DT_ULTIMO_ESCLARECIMENTO,
+            COALESCE(mig.ID_CARTA_CANONICO, c.ID_CARTA) AS ID_CARTA_CANONICO,
+            CASE WHEN mig.ID_CARTA_ANTIGO IS NOT NULL THEN 'Sim' ELSE 'Nao' END AS FLG_ID_CARTA_MIGRADO
+        FROM _cartas c
+        LEFT JOIN _colecoes col ON c.COD_COLECAO = col.COD_COLECAO
+        LEFT JOIN _esclarecimentos_agg e ON c.ID_ORACLE = e.ID_ORACLE
+        LEFT JOIN _migracoes_resolvidas mig ON c.ID_CARTA = mig.ID_CARTA_ANTIGO
+    """)
+
+
+def consulta_view_mercado(catalogo):
+    """SELECT da view TB_FATO_MERCADO_CARTAS. Nomes completos: a view vive no
+    catálogo, não enxerga temp view. ANO/MES vêm das colunas de partição da
+    Silver, então filtro por ANO_COTACAO/MES_COTACAO poda partição."""
+    return f"""
+        SELECT
+            d.ID_CARTA,
+            d.ID_ORACLE,
+            d.NME_CARTA,
+            d.NME_TIPO_CARTA,
+            d.NME_RARIDADE,
+            d.NME_CATEGORIA_COR,
+            d.COD_CORES,
+            d.QTD_CUSTO_MANA,
+            d.COD_COLECAO,
+            d.NME_COLECAO,
+            d.NME_BLOCO,
+            d.DT_LANCAMENTO_COLECAO,
             p.DT_INGESTAO AS DT_COTACAO,
             p.VLR_USD,
             p.VLR_USD_FOIL,
@@ -155,20 +194,15 @@ def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclar
             p.VLR_EUR,
             p.VLR_EUR_FOIL,
             p.VLR_TIX,
-            COALESCE(e.QTD_ESCLARECIMENTOS, 0) AS QTD_ESCLARECIMENTOS,
-            COALESCE(e.DT_ULTIMO_ESCLARECIMENTO, DATE'1001-01-01') AS DT_ULTIMO_ESCLARECIMENTO,
-            COALESCE(mig.ID_CARTA_CANONICO, c.ID_CARTA) AS ID_CARTA_CANONICO,
-            CASE WHEN mig.ID_CARTA_ANTIGO IS NOT NULL THEN 'Sim' ELSE 'Nao' END AS FLG_ID_CARTA_MIGRADO,
-            YEAR(p.DT_INGESTAO) AS ANO_COTACAO,
-            MONTH(p.DT_INGESTAO) AS MES_COTACAO
-        FROM _cartas c
-        INNER JOIN _precos p ON c.ID_CARTA = p.ID_CARTA
-        LEFT JOIN _colecoes col ON c.COD_COLECAO = col.COD_COLECAO
-        LEFT JOIN _esclarecimentos_agg e ON c.ID_ORACLE = e.ID_ORACLE
-        LEFT JOIN _migracoes_resolvidas mig ON c.ID_CARTA = mig.ID_CARTA_ANTIGO
-    """)
-
-    return df_final
+            d.QTD_ESCLARECIMENTOS,
+            d.DT_ULTIMO_ESCLARECIMENTO,
+            d.ID_CARTA_CANONICO,
+            d.FLG_ID_CARTA_MIGRADO,
+            p.ANO_INGESTAO AS ANO_COTACAO,
+            p.MES_INGESTAO AS MES_COTACAO
+        FROM {catalogo}.silver.TB_FATO_PRECOS_CARTAS p
+        INNER JOIN {catalogo}.gold.TB_DIM_CARTAS d ON p.ID_CARTA = d.ID_CARTA
+    """
 
 
 # =============================================================================
@@ -190,7 +224,7 @@ dq_resultados = {}
 qtd_lidos = 0
 qtd_processados = 0
 nome_completo_tabela = f"{config['catalog_name']}.{config['schema_gold']}.TB_FATO_MERCADO_CARTAS"
-processador = GoldTableProcessor("TB_FATO_MERCADO_CARTAS", config)
+processador = GoldTableProcessor("TB_DIM_CARTAS", config)
 
 try:
     df_cartas = processador.extrair_da_silver("TB_FATO_CARTAS")
@@ -204,22 +238,27 @@ try:
         + df_esclarecimentos.count() + df_migracoes.count()
     )
 
-    # cache: o count abaixo materializa o join; checagem de duplicata e MERGE
-    # reusam em vez de refazer o join.
-    df_gold = transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes).cache()
-    qtd_processados = df_gold.count()
+    # cache: checagem de duplicata e escrita reusam o join.
+    df_dim = transformar_dim_cartas(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes).cache()
 
     try:
         processador.salvar_tabela_gold(
-            df_gold,
-            colunas_particao=["ANO_COTACAO", "MES_COTACAO"],
-            coluna_chave=["ID_CARTA", "DT_COTACAO"],
-            comentario_tabela=obter_comentario_tabela("TB_FATO_MERCADO_CARTAS"),
-            comentarios_colunas=obter_comentarios_colunas("TB_FATO_MERCADO_CARTAS")
+            df_dim,
+            coluna_chave="ID_CARTA",
+            comentario_tabela=obter_comentario_tabela("TB_DIM_CARTAS"),
+            comentarios_colunas=obter_comentarios_colunas("TB_DIM_CARTAS")
         )
     except RuntimeError:
         status_auditoria = "FALHA_DQ_PK"
         raise
+
+    criar_view_gold(
+        nome_completo_tabela,
+        consulta_view_mercado(config['catalog_name']),
+        obter_comentario_tabela("TB_FATO_MERCADO_CARTAS") + " Chave única: ID_CARTA, DT_COTACAO.",
+        obter_comentarios_colunas("TB_FATO_MERCADO_CARTAS"),
+    )
+    qtd_processados = spark.table(nome_completo_tabela).count()
 
     # DATA QUALITY (pós-carga)
     dq_resultados = executar_checagens_dq(spark, nome_completo_tabela, {
@@ -276,4 +315,4 @@ finally:
 # =============================================================================
 print(f"Processamento concluído com sucesso!")
 print(f"Registros processados: {qtd_processados}")
-print(f"Colunas finais: {df_gold.columns}")
+print(f"Colunas finais: {spark.table(nome_completo_tabela).columns}")

@@ -137,7 +137,7 @@ pipeline-databricks-mtg-dev/
 
 ### 4. Gold Layer
 - **Função**: Visão de mercado pronta para consumo direto por analista, BI ou Genie, sem precisar conhecer Bronze/Silver
-- **Dados**: 1 tabela (`TB_FATO_MERCADO_CARTAS`) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; usa as 5 tabelas Silver
+- **Dados**: 1 view (`TB_FATO_MERCADO_CARTAS`, sobre a tabela `TB_DIM_CARTAS` + preços da Silver) — combina catálogo de carta, coleção, cotação de preço, esclarecimentos de regras e migrações de ID; usa as 5 tabelas Silver
 - **Grão**: 1 linha por cotação de preço de uma impressão de carta — chave `(ID_CARTA, DT_COTACAO)`
 - **Carga**: Full extract da Silver a cada execução + merge Delta idempotente pela chave, particionada por ano/mês de cotação
 - **Qualidade**: Checagens de PK/FK, valor negativo de preço e nulo residual, auditadas por run em `TB_AUDITORIA_GOLD`

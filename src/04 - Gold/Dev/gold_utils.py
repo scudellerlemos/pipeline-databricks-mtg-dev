@@ -17,12 +17,12 @@ EXEMPLO DE USO NO NOTEBOOK:
 %run ./gold_utils
 
 config = criar_config_manual("meu_catalog", "s3://meu-bucket")
-processador = GoldTableProcessor("TB_FATO_MERCADO_CARTAS", config)
+processador = GoldTableProcessor("TB_DIM_CARTAS", config)
 
 df_cartas = processador.extrair_da_silver("TB_FATO_CARTAS")
-df_gold = processador.transformar_dados(df_cartas, funcao_transformacao)
-processador.salvar_tabela_gold(df_gold, colunas_particao=["ANO_COTACAO", "MES_COTACAO"],
-                               coluna_chave=["ID_CARTA", "DT_COTACAO"])
+df_dim = processador.transformar_dados(df_cartas, funcao_transformacao)
+processador.salvar_tabela_gold(df_dim, coluna_chave="ID_CARTA")
+criar_view_gold("catalog.gold.TB_FATO_MERCADO_CARTAS", "SELECT ...", comentario, comentarios_colunas)
 """
 
 import uuid
@@ -138,35 +138,23 @@ def _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, co
 # ============================================================================
 # FUNÇÃO DE CARREGAMENTO DELTA/UNITY CATALOG
 # ============================================================================
-def montar_condicao_update(colunas_lote, colunas_chave, campos_atuais):
-    """Condição do whenMatchedUpdate: só atualiza linha com algum valor diferente.
-
-    O lote é recalculado inteiro a cada run e toda chave casa; sem condição o
-    MERGE regrava todos os arquivos da tabela. Coluna nova no lote -> None
-    (atualiza tudo) para preencher o histórico.
-    """
-    if not set(colunas_lote) <= set(campos_atuais):
-        return None
-    return " OR ".join(
-        f"NOT (gold.{c} <=> novo.{c})" for c in colunas_lote if c not in colunas_chave
-    ) or None
-
-
 def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
                    colunas_particao=None, coluna_chave=None,
                    comentario_tabela=None, comentarios_colunas=None, permitir_quebra_esquema=False):
     """
-    LOAD: grava df_final na camada Gold (Delta + Unity Catalog).
+    LOAD: grava df_final na camada Gold (Delta + Unity Catalog) com overwrite.
 
-    Full load na 1a carga, MERGE por coluna_chave nas seguintes (como
-    salvar_na_silver). Lote com chave duplicada aborta antes de gravar.
+    A Gold só grava o que é recalculado inteiro a cada run (dimensão); o
+    histórico de preço fica na Silver e chega à Gold por view (criar_view_gold).
+    Overwrite em vez de MERGE: o que sai da Silver sai da Gold. Lote com chave
+    duplicada aborta antes de gravar.
 
     Args:
         df_final (DataFrame): DataFrame final para salvar
         catalogo, esquema, nome_tabela (str): identificação da tabela no Unity Catalog
         caminho_s3_gold (str): caminho/bucket S3 base para Gold (com ou sem "s3://")
         colunas_particao (list, optional): colunas para particionamento
-        coluna_chave (str or list, optional): coluna(s) chave para merge incremental
+        coluna_chave (str or list, optional): chave única, declarada como PRIMARY KEY
         comentario_tabela (str, optional): descrição de negócio da tabela (ver
             gold_column_docs.py).
         comentarios_colunas (dict, optional): {nome_coluna: descrição de negócio}
@@ -183,6 +171,7 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
 
     sessao_spark.sql(f"CREATE SCHEMA IF NOT EXISTS {catalogo}.{esquema}")
 
+    colunas_chave = None
     if coluna_chave:
         colunas_chave = [coluna_chave] if isinstance(coluna_chave, str) else list(coluna_chave)
         # Duplicata no lote é bug a montante (PK da Silver ou join): aborta em
@@ -195,9 +184,8 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
                 f"Corrija a fonte/transformação."
             )
 
-    arquivos_existem = DeltaTable.isDeltaTable(sessao_spark, caminho_delta)
-
     # Contrato de schema antes de qualquer escrita (ver base_utils).
+    arquivos_existem = DeltaTable.isDeltaTable(sessao_spark, caminho_delta)
     campos_atuais = campos_do_esquema(DeltaTable.forPath(sessao_spark, caminho_delta).toDF().schema) if arquivos_existem else {}
     validar_contrato_esquema(
         nome_completo_tabela, campos_atuais, campos_do_esquema(df_final.schema),
@@ -205,46 +193,18 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         permitir_quebra=permitir_quebra_esquema,
     )
 
-    if not arquivos_existem:
-        print(f"Delta ainda não existe em {caminho_delta}. Criando (primeira carga).")
-        escritor = df_final.write.format("delta").mode("overwrite")
-        if colunas_particao:
-            escritor = escritor.partitionBy(*colunas_particao)
-        escritor.save(caminho_delta)
-        print(f"Tabela criada com {df_final.count()} linhas.")
-
-    elif coluna_chave:
-        colunas_chave = [coluna_chave] if isinstance(coluna_chave, str) else list(coluna_chave)
-
-        # <=> (null-safe): com "=", chave nula nunca casa e seria reinserida a cada run.
-        condicao_merge = " AND ".join(f"gold.{k} <=> novo.{k}" for k in colunas_chave)
-        condicao_update = montar_condicao_update(df_final.columns, colunas_chave, campos_atuais)
-
-        # withSchemaEvolution(): coluna nova entra sem migração. Exige Delta 3.1+ (DBR 15.2+).
-        tabela_delta = DeltaTable.forPath(sessao_spark, caminho_delta)
-        (
-            tabela_delta.alias("gold")
-            .merge(df_final.alias("novo"), condicao_merge)
-            .withSchemaEvolution()
-            .whenMatchedUpdateAll(condition=condicao_update)
-            .whenNotMatchedInsertAll()
-            .execute()
-        )
-
-        print(f"Merge concluído em {nome_completo_tabela}.")
-
-    else:
-        print("Tabela Delta já existe mas sem coluna_chave. Fazendo overwrite.")
-        df_final.write.format("delta").mode("overwrite").save(caminho_delta)
+    # overwriteSchema: coluna nova já passou pelo contrato acima.
+    escritor = df_final.write.format("delta").mode("overwrite").option("overwriteSchema", "true")
+    if colunas_particao:
+        escritor = escritor.partitionBy(*colunas_particao)
+    escritor.save(caminho_delta)
 
     sessao_spark.sql(
         f"CREATE TABLE IF NOT EXISTS {nome_completo_tabela} USING DELTA LOCATION '{caminho_delta}'"
     )
 
     comentario_final_tabela = comentario_tabela
-    colunas_chave = None
-    if coluna_chave:
-        colunas_chave = [coluna_chave] if isinstance(coluna_chave, str) else list(coluna_chave)
+    if colunas_chave:
         nota_chave = f"Chave única: {', '.join(colunas_chave)}."
         comentario_final_tabela = f"{comentario_tabela} {nota_chave}" if comentario_tabela else nota_chave
 
@@ -254,6 +214,41 @@ def salvar_na_gold(df_final, catalogo, esquema, nome_tabela, caminho_s3_gold,
         _declarar_chave_primaria(sessao_spark, nome_completo_tabela, nome_tabela, colunas_chave)
 
     print("Dados salvos com sucesso na camada Gold!")
+
+
+def criar_view_gold(nome_completo_view, consulta_sql, comentario_view, comentarios_colunas,
+                    permitir_quebra_esquema=False):
+    """
+    CREATE OR REPLACE VIEW com os comentários no próprio DDL (view não aceita
+    ALTER COLUMN COMMENT). Mesmo contrato de schema das tabelas: coluna
+    removida ou com tipo alterado aborta antes de trocar a view.
+
+    Se o nome ainda for uma tabela (a Gold era EXTERNAL antes de virar view),
+    faz DROP TABLE: só tira do catálogo, os arquivos continuam no S3.
+    """
+    sessao_spark = obter_sessao_spark()
+    esquema_novo = sessao_spark.sql(consulta_sql).schema
+
+    existe = sessao_spark.catalog.tableExists(nome_completo_view)
+    campos_atuais = campos_do_esquema(sessao_spark.table(nome_completo_view).schema) if existe else {}
+    validar_contrato_esquema(
+        nome_completo_view, campos_atuais, campos_do_esquema(esquema_novo),
+        colunas_documentadas=list(comentarios_colunas),
+        permitir_quebra=permitir_quebra_esquema,
+    )
+
+    if existe and sessao_spark.catalog.getTable(nome_completo_view).tableType != "VIEW":
+        print(f"{nome_completo_view} ainda é tabela: DROP TABLE (arquivos ficam no S3) para virar view.")
+        sessao_spark.sql(f"DROP TABLE {nome_completo_view}")
+
+    colunas = ",\n  ".join(
+        f"`{c}` COMMENT '{_escapar_string_sql(comentarios_colunas[c])}'" for c in esquema_novo.names
+    )
+    sessao_spark.sql(
+        f"CREATE OR REPLACE VIEW {nome_completo_view} (\n  {colunas}\n)\n"
+        f"COMMENT '{_escapar_string_sql(comentario_view)}'\nAS\n{consulta_sql}"
+    )
+    print(f"View {nome_completo_view} criada/atualizada.")
 
 
 # ============================================================================
