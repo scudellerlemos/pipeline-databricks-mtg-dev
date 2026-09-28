@@ -43,7 +43,9 @@ torna impossível reprocessar uma etapa sem refazer as outras.
   (`TB_FATO_MERCADO_CARTAS`).
 
 Cada camada é um job (`MTG_STAGE`, `MTG_BRONZE`, `MTG_SILVER`, `MTG_GOLD`) e o
-`MTG_PIPELINE` orquestra a ordem via `run_job_task`.
+`MTG_PIPELINE` orquestra a ordem. No YAML ele lista as camadas como
+`run_job_task`; o deploy embute as tasks de cada camada num job só, com um
+cluster só (antes cada camada subia o próprio, ~115s de setup cada).
 
 **Consequências.** Qualquer camada reprocessa sozinha a partir da anterior. O
 custo é armazenar o dado em cada camada (Parquet na Stage + Delta em Bronze/Silver/Gold), irrelevante no volume atual.
@@ -96,9 +98,9 @@ saída é retenção/`VACUUM`, não mudar o modo de escrita.
 `job_id`, que só existe depois do deploy.
 
 **Decisão.** Cada job é um YAML em `.github/DAGs/`. O `.github/scripts/deploy.py`
-faz o deploy na ordem Stage → Bronze → Silver → Gold → Pipeline, troca os
-placeholders `{{MTG_*_JOB_ID}}` pelos IDs reais e usa `jobs reset` (settings
-inteiras, sem drift de alteração manual pela UI).
+faz o deploy na ordem Stage → Bronze → Silver → Gold → Pipeline, troca cada
+placeholder `{{MTG_*_JOB_ID}}` do pipeline pelas tasks da camada e usa
+`jobs reset` (settings inteiras, sem drift de alteração manual pela UI).
 
 **Alternativa descartada.** Databricks Asset Bundles resolvem as referências
 nativamente e seriam o caminho numa empresa (um bundle por projeto, deploy só
