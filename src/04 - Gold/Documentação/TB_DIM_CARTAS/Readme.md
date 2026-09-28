@@ -19,7 +19,7 @@ Uma linha por impressão de carta de Magic: The Gathering com os atributos atuai
 Mesmas de `TB_FATO_MERCADO_CARTAS` para as colunas em comum: `NME_COLECAO`/`NME_BLOCO` NULOS -> `Nao_Identificado`, `QTD_ESCLARECIMENTOS` NULO -> 0, data NULA -> `1001-01-01`, `ID_CARTA_CANONICO` cai no próprio `ID_CARTA` sem migração. Ver [TB_FATO_MERCADO_CARTAS](../TB_FATO_MERCADO_CARTAS/Readme.md#5-regras-de-nulo).
 
 ## 6. Carga
-Recalculada inteira e gravada com `overwrite` a cada execução (tamanho do catálogo, não cresce com o histórico). Antes do overwrite, a versão anterior é comparada com a nova (`EXCEPT` via time travel): as cartas que mudaram têm todo o histórico reprocessado em `TB_FATO_MERCADO_CARTAS` ([ADR-013](../../../../docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)). Mesmo notebook e mesma task da fato (`Dev/TB_FATO_MERCADO_CARTAS.py`).
+Recalculada inteira e gravada com `overwrite` a cada execução (tamanho do catálogo, não cresce com o histórico). A dimensão recalculada é comparada com a gravada (`EXCEPT`): as cartas que mudaram têm todo o histórico reprocessado em `TB_FATO_MERCADO_CARTAS`. É gravada depois da fato: se a fato falhar, esta tabela segue a antiga e a próxima run acha as mesmas cartas mudadas ([ADR-013](../../../../docs/ADR.md#adr-013--gold-incremental-com-propagação-da-dimensão)). Mesmo notebook e mesma task da fato (`Dev/TB_FATO_MERCADO_CARTAS.py`).
 
 ## 7. Data Quality e Auditoria
 PK com chave NULA ou duplicada aborta a run (`FALHA_DQ_PK`). Os DQs pré-join e a auditoria em `TB_AUDITORIA_GOLD` são os da execução de `TB_FATO_MERCADO_CARTAS` (1 linha por run cobre as duas tabelas).
