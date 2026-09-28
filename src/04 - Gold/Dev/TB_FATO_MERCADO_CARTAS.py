@@ -168,7 +168,6 @@ def transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclar
         LEFT JOIN _migracoes_resolvidas mig ON c.ID_CARTA = mig.ID_CARTA_ANTIGO
     """)
 
-    logger.info(f"Transformação Gold concluída: {df_final.count()} registros")
     return df_final
 
 
@@ -205,7 +204,9 @@ try:
         + df_esclarecimentos.count() + df_migracoes.count()
     )
 
-    df_gold = transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes)
+    # cache: o count abaixo materializa o join; checagem de duplicata e MERGE
+    # reusam em vez de refazer o join.
+    df_gold = transformar_mercado_cartas_gold(df_cartas, df_colecoes, df_precos, df_esclarecimentos, df_migracoes).cache()
     qtd_processados = df_gold.count()
 
     try:

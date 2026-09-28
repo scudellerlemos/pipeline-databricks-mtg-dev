@@ -314,9 +314,11 @@ class SilverTableProcessor:
 
     def transformar_dados(self, df, funcao_transformacao, **kwargs):
         """Aplica função de transformação personalizada (lógica em SQL, no notebook)"""
+        # cache: o MERGE e o count() do fim do notebook reusam o resultado em
+        # vez de refazer a transformação desde a Bronze.
         if funcao_transformacao:
-            return funcao_transformacao(df, **kwargs)
-        return df
+            return funcao_transformacao(df, **kwargs).cache()
+        return df.cache()
 
     def salvar_tabela_silver(self, df, colunas_particao=None, coluna_chave=None, coluna_ordenacao=None,
                              comentario_tabela=None, comentarios_colunas=None,
