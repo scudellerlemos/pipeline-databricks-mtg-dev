@@ -238,37 +238,36 @@ Merge na `main` que mexe em código, com o CI verde, deploya em dev e publica em
 ### Cluster Configuration
 
 Definido em `.github/DAGs/{stage,bronze,silver,gold}.yml` — os quatro usam o
-mesmo bloco, e dev e prd usam o mesmo pool:
+mesmo bloco, e dev e prd usam o mesmo cluster:
 
 ```yaml
 spark_version: "15.4.x-scala2.12"
-instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
-driver_instance_pool_id: "0925-163505-peep89-pool-mgfqrcwi"
-autoscale:
-  min_workers: 1
-  max_workers: 2
+node_type_id: "m5d.2xlarge"   # 8 vCPU / 32 GB
+num_workers: 0                # single-node: tudo roda no driver
+aws_attributes:
+  availability: "ON_DEMAND"
+  zone_id: "us-west-2a"
+custom_tags:
+  ResourceClass: "SingleNode"
 spark_conf:
+  spark.master: "local[*]"
+  spark.databricks.cluster.profile: "singleNode"
   spark.databricks.delta.preview.enabled: "true"
   spark.databricks.delta.optimizeWrite.enabled: "true"
   spark.databricks.delta.autoCompact.enabled: "true"
 ```
 
-O node type (`m5d.large`), a zona (`us-west-2a`) e a disponibilidade (`ON_DEMAND`)
-vêm do instance pool `mtg-pipeline-pool-dbr154`, não do YAML:
+Por que single-node e sem instance pool (medido no run de prd de 27/09/2026):
 
-| Campo do pool | Valor |
-|---|---|
-| `node_type_id` | `m5d.large` |
-| `preloaded_spark_versions` | `15.4.x-scala2.12` |
-| `min_idle_instances` | `0` |
-| `max_capacity` | `6` |
-| `idle_instance_autotermination_minutes` | `10` |
+- O gargalo era o driver: CPU 80-99%, memória ~92% e swap de até 85%
+  (Stage) num m5d.large (2 vCPU / 8 GB), com os workers quase ociosos. O volume
+  (centenas de MB por mês) cabe numa máquina só.
+- O pool antigo (`min_idle_instances: 0`) não reaproveitava instância entre
+  camadas: cada uma levou ~200s para subir mesmo começando segundos depois do fim
+  da anterior. Sem ganho, só mais uma peça de infra.
 
-> **`preloaded_spark_versions` do pool tem que bater com o `spark_version` dos
-> YAMLs.** Se divergir, o cluster baixa e instala o runtime inteiro em cada subida
-> — que é justamente o custo que o pool existe pra eliminar. Esse campo é
-> **imutável depois que o pool é criado**: pra trocar de runtime é preciso criar um
-> pool novo e atualizar o `instance_pool_id` nos quatro YAMLs.
+Se o volume crescer a ponto de não caber em 32 GB, o caminho é voltar a ter
+workers (`num_workers`/`autoscale`) e tirar `spark.master`/`profile`/`ResourceClass`.
 
 ### Schedule
 - **Frequência**: Mensal, 1ª segunda-feira do mês, às 6h (Brasil) — `MTG_PIPELINE` em `.github/DAGs/pipeline.yml`
@@ -277,7 +276,7 @@ vêm do instance pool `mtg-pipeline-pool-dbr154`, não do YAML:
 
 ### Diferenças entre Ambientes
 
-Mesmo código, workspace, pool e secret scope. Dev usa o YAML e o secret scope;
+Mesmo código, workspace, cluster e secret scope. Dev usa o YAML e o secret scope;
 prd sobrescreve via env var `MTG_*` injetada pelo `deploy.py` ([ADR-005](docs/ADR.md#adr-005--dev-e-prd-no-mesmo-workspace-diferença-só-por-env-var)):
 
 | Aspecto | DEV | PRD |

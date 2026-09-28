@@ -114,7 +114,7 @@ projetos crescer.
 outro workspace duplicaria custo e administração sem ganho real de isolamento
 para uma pessoa só.
 
-**Decisão.** Os dois ambientes usam o mesmo código, o mesmo instance pool e o
+**Decisão.** Os dois ambientes usam o mesmo código, a mesma configuração de cluster e o
 mesmo secret scope (`mtg-pipeline`). O que difere viaja como env var `MTG_*`
 no workflow e o `deploy.py` injeta no job:
 

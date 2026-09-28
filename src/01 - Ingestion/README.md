@@ -80,8 +80,9 @@ do pipeline, não limite da fonte.
 
 Os notebooks são independentes entre si — nenhum lê o S3 gravado por outro. No
 job `MTG_STAGE` (`.github/DAGs/stage.yml`) as 5 tasks rodam em paralelo, sem
-`depends_on` entre elas. O cluster do job tem autoscale (1→2 workers) para
-aguentar o pico das tasks em paralelo (com 1 worker fixo, as 6 que existiam davam OOM).
+`depends_on` entre elas, num cluster single-node m5d.2xlarge (8 vCPU / 32 GB).
+Antes era driver m5d.large + 1→2 workers, e o driver saturava (swap de até 85%)
+com as tasks em paralelo.
 
 `card_prices.py` não depende de `cards.py`: grava seu próprio snapshot de
 `default_cards` (1 linha por impressão, com `id`) filtrado pela mesma janela
